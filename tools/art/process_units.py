@@ -28,9 +28,10 @@ SIZE = 256
 UNITS = {
     "uniform": (0.75, 0.73, 0.67),   # tkanina munduru — pod barwienie strony
     "armor":   (0.69, 0.70, 0.67),   # blacha pojazdu — pod barwienie strony
+    "track":   (0.62, 0.63, 0.64),   # ogniwa gąsienicy — ciemniejsze po stronie
 }
 
-NAMES = {"uniform": "mundur piechoty", "armor": "pancerz pojazdu"}
+NAMES = {"uniform": "mundur piechoty", "armor": "pancerz pojazdu", "track": "gąsienica"}
 
 
 def process(key, raw_path, out_dir):

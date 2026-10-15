@@ -97,7 +97,8 @@ assets/textures/terrain/<klucz>.png        512×512  — teren: materiały 3D bi
 assets/textures/terrain/tiles/<klucz>.png   16×16   — teren: kafle mapy kampanii
 assets/textures/props/<klucz>.png          256×256  — otoczenie: pnie, korony,
                                                        skały, ściany i dachy
-assets/textures/units/<klucz>.png          256×256  — sprzęt: mundur i pancerz
+assets/textures/units/<klucz>.png          256×256  — sprzęt: mundur, pancerz,
+                                                       ogniwa gąsienicy
 assets/textures/icons/<klucz>.png          128×128  — ikony mapy (RGBA)
 scripts/logic/game_textures.gd      loader tekstur (z zapasem na płaskie kolory)
 tools/art/pipeline.py               rdzeń: dopasowanie kolorystyki obrazu
@@ -110,9 +111,14 @@ assets/textures/*/README.md         palety, prompty, instrukcja odtworzenia
 ```
 
 Zestaw: 13 rodzajów terenu (kafle mapy i materiały gruntu bitwy), 5 tekstur
-otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 2 tekstury
-sprzętu (mundur, pancerz) i 6 ikon mapy (gracz, wróg, cel, miasto, łódź,
-zwiadowca).
+otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 3 tekstury
+sprzętu (mundur, pancerz, ogniwa gąsienicy) i 6 ikon mapy (gracz, wróg, cel,
+miasto, łódź, zwiadowca).
+
+Sylwetki pojazdów nie są już prostopadłościanami: czołg (16 brył) ma dwa
+prostopadłościany gąsienic, po pięć kół, wieżę z włazem i lufę, a wóz bojowy
+(13 brył) — dwie gąsienice, cztery koła, wieżyczkę i lufę. Koła to walce
+obrócone osią w Z, więc toczą się w kierunku marszu.
 
 Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez kolor strony
 (`albedo_color`): detal daje tekstura, a zielony gracz / niebiescy sojusznicy /
@@ -145,8 +151,10 @@ sceny, a na końcu wypisuje `RESULT: PASS` albo `RESULT: FAIL`.
 * `test_playthrough` — cała rozgrywka bez okna: bot maszeruje do celów, rozgrywa
   bitwy prawdziwym symulatorem, rozlicza je i w trakcie kampanii robi zapis/odczyt.
 * `test_textures` — wszystkie kafle i materiały mają właściwy rozmiar
-  (16×16 kafle mapy, 512×512 teren, 256×256 otoczenie), nic nie wypadło
-  z palety ani z nazw plików.
+  (16×16 kafle mapy, 512×512 teren, 256×256 otoczenie i sprzęt, 128×128 ikony),
+  nic nie wypadło z palety ani z nazw plików.
+* `test_views` — składa obie sceny jak gra i sprawdza, że sylwetki pojazdów
+  mają komplet brył, a materiały naprawdę niosą tekstury AI.
 
 Pojedynczy test:
 
@@ -185,13 +193,15 @@ assets/textures/props/     tekstury otoczenia bitwy 256×256 (grafika AI)
 tools/art/                 pipeline tekstur: przetwarzanie i podglądy
 tests/                     testy logiki + wzorzec map
 tests/test_playthrough.gd  pełna rozgrywka bez okna (bot + bitwy + zapis)
-tests/test_textures.gd     kompletność i rozmiary tekstur (teren + otoczenie)
+tests/test_textures.gd     kompletność i rozmiary tekstur (teren, otoczenie, sprzęt, ikony)
+tests/test_views.gd        składanie scen: sylwetki jednostek i etykiety HUD
 ```
 
 ## Czego jeszcze nie ma
 
-* Tekstur jednostek i ikon interfejsu — teren i otoczenie bitwy mają już grafikę
-  AI, ale żołnierze, pojazdy i HUD to nadal prymitywy i płaskie kolory.
+* Modeli pojazdów (siatki z gąsienicami, kołami i lufą) — dziś sylwetki składają
+  się z brył z teksturami AI, więc są kanciaste.
+* Ikon samego HUD (pasek stanu, wskaźnik broni) — na razie tylko tekst.
 * Dźwięku (do przeniesienia z wersji TypeScript projektu).
 * Eksportu web (wymaga szablonów eksportu Godota 4.7).
 * Strojenia balansu — wartości startowe nie były jeszcze grane „na żywo”.

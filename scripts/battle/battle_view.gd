@@ -1,6 +1,9 @@
 extends Node3D
 ## Widok bitwy FPS: pole 1000 × 400 m, kamera pierwszej osoby, prymitywy 3D.
 ##
+## Sylwetki: piechur to kapsuła w mundurze, czołg i wóz bojowy mają kadłub,
+## dwie gąsienice z kołami, wieżę z włazem i lufę (bryły z teksturami AI).
+##
 ## Klawisze: WSAD/strzałki — ruch, mysz — obrót, LPM/Spacja — ognia,
 ## E — wsiadanie/wysiadanie, R — odwrót (x < 40 m), Esc — pauza, Enter — powrót.
 
@@ -21,6 +24,7 @@ const COLOR_ENEMY := Color(0.85, 0.20, 0.20)
 const COLOR_TRUNK := Color(0.30, 0.22, 0.14)
 const COLOR_CANOPY := Color(0.16, 0.42, 0.20)
 const COLOR_ROCK := Color(0.45, 0.42, 0.38)
+const METAL_DARK := Color(0.15, 0.15, 0.15)
 
 var sim
 var campaign
@@ -236,12 +240,11 @@ func _add_sphere(radius: float, color: Color, pos: Vector3, texture: Texture2D =
 
 func _build_units() -> void:
 	unit_nodes = []
-	# Tekstury sprzętu: mundur dla piechoty, pancerz dla pojazdów. Są jasne
-	# i neutralne, bo kolor strony jest mnożony w materiale (_material_side).
+	# Tekstury sprzętu: mundur dla piechoty, pancerz i gąsienica dla pojazdów.
+	# Są jasne i neutralne, bo kolor strony jest mnożony w materiale (_material_side).
 	var uniform: Texture2D = GameTextures.unit("uniform")
 	var armor: Texture2D = GameTextures.unit("armor")
-	var uv_infantry := Vector3(1.5, 1.5, 1.5)
-	var uv_hull := Vector3(2.0, 1.0, 1.0)
+	var track: Texture2D = GameTextures.unit("track")
 	for unit in sim.units:
 		var cls: String = str(unit["cls"])
 		var is_player: bool = bool(unit["is_player"])
@@ -250,47 +253,117 @@ func _build_units() -> void:
 		node.name = "unit_%d" % unit_nodes.size()
 		add_child(node)
 		if cls == UnitsData.CLS_INFANTRY:
-			var body := CapsuleMesh.new()
-			body.radius = 0.4
-			body.height = 1.7
-			var body_node := MeshInstance3D.new()
-			body_node.mesh = body
-			body_node.material_override = _material_side(uniform, color, uv_infantry)
-			body_node.position = Vector3(0, 0.85, 0)
-			node.add_child(body_node)
-			var rifle := BoxMesh.new()
-			rifle.size = Vector3(1.1, 0.12, 0.12)
-			var rifle_node := MeshInstance3D.new()
-			rifle_node.mesh = rifle
-			rifle_node.material_override = _material(Color(0.15, 0.15, 0.15))
-			rifle_node.position = Vector3(0.5, 1.30, 0)
-			node.add_child(rifle_node)
+			_build_infantry(node, color, uniform)
 		elif cls == UnitsData.CLS_MECH:
-			var hull := BoxMesh.new()
-			hull.size = Vector3(6.0, 1.9, 2.6)
-			var hull_node := MeshInstance3D.new()
-			hull_node.mesh = hull
-			hull_node.material_override = _material_side(armor, color, uv_hull)
-			hull_node.position = Vector3(0, 1.0, 0)
-			node.add_child(hull_node)
+			_build_mech(node, color, armor, track)
 		else:
-			var hull := BoxMesh.new()
-			hull.size = Vector3(7.0, 2.0, 3.2)
-			var hull_node := MeshInstance3D.new()
-			hull_node.mesh = hull
-			hull_node.material_override = _material_side(armor, color, uv_hull)
-			hull_node.position = Vector3(0, 1.1, 0)
-			node.add_child(hull_node)
-			var turret := CylinderMesh.new()
-			turret.top_radius = 1.1
-			turret.bottom_radius = 1.3
-			turret.height = 0.7
-			var turret_node := MeshInstance3D.new()
-			turret_node.mesh = turret
-			turret_node.material_override = _material_side(armor, color.darkened(0.2), uv_hull)
-			turret_node.position = Vector3(0.2, 2.4, 0)
-			node.add_child(turret_node)
+			_build_armor(node, color, armor, track)
 		unit_nodes.append(node)
+
+
+## Piechur: kapsuła w mundurze + karabin.
+func _build_infantry(node: Node3D, color: Color, uniform: Texture2D) -> void:
+	var body := CapsuleMesh.new()
+	body.radius = 0.4
+	body.height = 1.7
+	var body_node := MeshInstance3D.new()
+	body_node.mesh = body
+	body_node.material_override = _material_side(uniform, color, Vector3(1.5, 1.5, 1.5))
+	body_node.position = Vector3(0, 0.85, 0)
+	node.add_child(body_node)
+
+	var rifle := BoxMesh.new()
+	rifle.size = Vector3(1.1, 0.12, 0.12)
+	var rifle_node := MeshInstance3D.new()
+	rifle_node.mesh = rifle
+	rifle_node.material_override = _material(METAL_DARK)
+	rifle_node.position = Vector3(0.5, 1.30, 0)
+	node.add_child(rifle_node)
+
+
+## Czołg: kadłub, dwie gąsienice z kołami, wieża z włazem i lufą.
+func _build_armor(node: Node3D, color: Color, armor: Texture2D, track: Texture2D) -> void:
+	_add_vehicle_hull(node, Vector3(7.0, 2.0, 3.2), 1.1, color, armor)
+	_add_tracks(node, 7.4, 1.6, 5, color, track)
+	_add_local_cylinder(node, 1.1, 1.3, 0.7, Vector3(0.2, 2.4, 0), color.darkened(0.2), armor, Vector3(2.0, 1.0, 1.0))
+	_add_local_cylinder(node, 0.35, 0.35, 0.14, Vector3(0.0, 2.85, 0), color.darkened(0.35), armor, Vector3(1.0, 1.0, 1.0))
+	_add_barrel(node, Vector3(2.2, 2.45, 0.0), 3.6, 0.12)
+
+
+## Bojowy wóz piechoty albo transporter: mniejszy kadłub, gąsienice, mała wieżyczka.
+func _build_mech(node: Node3D, color: Color, armor: Texture2D, track: Texture2D) -> void:
+	_add_vehicle_hull(node, Vector3(6.0, 1.9, 2.6), 1.0, color, armor)
+	_add_tracks(node, 6.3, 1.35, 4, color, track)
+	_add_local_cylinder(node, 0.75, 0.85, 0.5, Vector3(0.3, 2.15, 0), color.darkened(0.2), armor, Vector3(1.5, 1.0, 1.0))
+	_add_barrel(node, Vector3(1.5, 2.2, 0.0), 2.2, 0.09)
+
+
+## Kadłub pojazdu: prostopadłościan z blachą pancerza w barwie strony.
+func _add_vehicle_hull(node: Node3D, size: Vector3, y: float, color: Color, armor: Texture2D) -> void:
+	var hull := BoxMesh.new()
+	hull.size = size
+	var hull_node := MeshInstance3D.new()
+	hull_node.mesh = hull
+	hull_node.material_override = _material_side(armor, color, Vector3(2.0, 1.0, 1.0))
+	hull_node.position = Vector3(0, y, 0)
+	node.add_child(hull_node)
+
+
+## Dwie gąsienice po bokach kadłuba, każda z rzędem kół.
+## Koła to walce obrócone osią wzdłuż Z, więc toczą się w kierunku marszu (+X).
+func _add_tracks(node: Node3D, length: float, half_width: float, wheels: int, color: Color, track: Texture2D) -> void:
+	var belt_color: Color = color.darkened(0.45)
+	var wheel_color: Color = color.darkened(0.6)
+	var uv_belt := Vector3(length / 4.0, 1.0, 1.0)
+	var step: float = length / float(wheels + 1)
+	for side in [-1.0, 1.0]:
+		var z: float = side * half_width
+		var belt := BoxMesh.new()
+		belt.size = Vector3(length, 1.1, 0.35)
+		var belt_node := MeshInstance3D.new()
+		belt_node.mesh = belt
+		belt_node.material_override = _material_side(track, belt_color, uv_belt)
+		belt_node.position = Vector3(0, 0.45, z)
+		node.add_child(belt_node)
+		for i in range(1, wheels + 1):
+			var wheel := CylinderMesh.new()
+			wheel.top_radius = 0.42
+			wheel.bottom_radius = 0.42
+			wheel.height = 0.7
+			var wheel_node := MeshInstance3D.new()
+			wheel_node.mesh = wheel
+			wheel_node.material_override = _material_side(track, wheel_color, Vector3(1.0, 1.0, 1.0))
+			wheel_node.position = Vector3(-length * 0.5 + step * float(i), 0.45, z)
+			wheel_node.rotation.x = PI * 0.5
+			node.add_child(wheel_node)
+
+
+## Lufa: zwężający się walec wysunięty do przodu z wieży (oś wzdłuż +X).
+func _add_barrel(node: Node3D, base: Vector3, length: float, radius: float) -> void:
+	var barrel := CylinderMesh.new()
+	barrel.top_radius = radius
+	barrel.bottom_radius = radius * 1.15
+	barrel.height = length
+	var barrel_node := MeshInstance3D.new()
+	barrel_node.mesh = barrel
+	barrel_node.material_override = _material(METAL_DARK)
+	barrel_node.position = Vector3(base.x + length * 0.5, base.y, base.z)
+	barrel_node.rotation.z = -PI * 0.5
+	node.add_child(barrel_node)
+
+
+## Walec w układzie jednostki (wieża, właz) — bez obrotu.
+func _add_local_cylinder(node: Node3D, top: float, bottom: float, height: float, pos: Vector3,
+		color: Color, texture: Texture2D, uv_scale: Vector3) -> void:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top
+	mesh.bottom_radius = bottom
+	mesh.height = height
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.mesh = mesh
+	mesh_node.material_override = _material_side(texture, color, uv_scale)
+	mesh_node.position = pos
+	node.add_child(mesh_node)
 
 
 # --- HUD ---------------------------------------------------------------------

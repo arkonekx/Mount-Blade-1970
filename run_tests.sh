@@ -4,9 +4,8 @@
 # Użycie:
 #   GODOT=/ścieżka/do/Godot ./run_tests.sh
 #
-# Skrypt uruchamia sześć testów logiki (test_map, test_campaign, test_battle,
-# test_save, test_playthrough, test_textures), a potem obie sceny oraz testy
-# tekstur; szuka też "SCRIPT ERROR" w wyjściu scen.
+# Skrypt uruchamia siedem testów (mapa, kampania, bitwa, zapis, pełna rozgrywka,
+# tekstury, widoki), a potem obie sceny; szuka też "SCRIPT ERROR" w ich wyjściu.
 
 set -u
 
@@ -22,7 +21,7 @@ fi
 
 fails=0
 
-for test_name in test_map test_campaign test_battle test_save test_playthrough test_textures; do
+for test_name in test_map test_campaign test_battle test_save test_playthrough test_textures test_views; do
 	echo "--- $test_name ---"
 	output=$(timeout 180 "$GODOT" --headless --path . -s "res://tests/$test_name.gd" 2>&1)
 	code=$?

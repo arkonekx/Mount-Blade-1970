@@ -83,8 +83,14 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `battle_view.gd` daje piechurom mundur, a pojazdom pancerz (materiał:
       tekstura × kolor strony); `tests/test_textures.gd` pilnuje obu zestawów,
       w tym przezroczystości ikon
-- [ ] sylwetki pojazdów (modele: gąsienice, koła, lufa) — obecnie bryły z teksturą
-- [ ] ikony HUD (pasek stanu, broń, cele) — na razie tylko znaczniki na mapie
+- [x] sylwetki pojazdów: czołg 16 brył (kadłub, dwie gąsienice, pięć kół,
+      wieża z włazem, lufa), wóz bojowy 13 brył (gąsienice, cztery koła,
+      wieżyczka, lufa) — koła to walce obrócone osią w Z, więc toczą się w +X
+- [x] tekstura ogniw gąsienicy (3. tekstura sprzętu, `track`)
+- [x] `tests/test_views.gd` — składa obie sceny jak gra i sprawdza liczbę brył
+      w sylwetkach (piechur ≥ 2, wóz ≥ 12, czołg ≥ 14) oraz to, że materiały
+      naprawdę mają tekstury AI
+- [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
 
@@ -110,8 +116,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 1. **Do potwierdzenia przez użytkownika**
    - Dowódca to osobny piechur, nie gracz — tak jest zaimplementowane.
    - Śmierć gracza kończy bitwę porażką, nawet gdy sojusznicy żyją — tak jest zaimplementowane.
-2. **Grafika (AI)** — teren, otoczenie bitwy, sprzęt i ikony mapy gotowe (etap 7);
-   zostają modele pojazdów (dziś bryły z dobrą teksturą) i ikony samego HUD.
+2. **Grafika (AI)** — teren, otoczenie, sprzęt, sylwetki pojazdów i ikony mapy
+   gotowe (etap 7); zostają modele siatkowe pojazdów i ikony samego HUD.
 3. **Dźwięk** — do przeniesienia z wersji TypeScript (nie ma go w tym repo).
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.
@@ -133,7 +139,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - Wszystkie testy i obie sceny zostały faktycznie uruchomione na tej binarke:
   pięć testów logiki = PASS, sceny `campaign` i `battle` startują bez błędów
   skryptów (`--quit-after 300`).
-- Liczba testów wzrosła do siedmiu (`test_terrain_textures` pilnuje kompletu tekstur).
+- Liczba testów wzrosła do ośmiu: `test_textures` pilnuje kompletu tekstur,
+  a `test_views` składa obie sceny i sprawdza sylwetki jednostek oraz HUD.
 - Analiza statyczna całego projektu (`@gdscript-analyzer/core` 0.6.1):
   **0 błędów, 0 ostrzeżeń** (pole `seed` w `campaign.gd` zmienione na
   `world_seed`, żeby nie przesłaniało globalnej funkcji `seed()`; klucz w pliku

@@ -29,7 +29,7 @@ const KEYS: Array = [
 const PROP_KEYS: Array = ["tree_bark", "tree_canopy", "rock", "wall", "roof"]
 
 ## Klucze tekstur sprzętu (są jasne i neutralne, bo w grze mnoży je kolor strony).
-const UNIT_KEYS: Array = ["uniform", "armor"]
+const UNIT_KEYS: Array = ["uniform", "armor", "track"]
 
 ## Klucze ikon interfejsu — kolejność jak w tools/art/process_icons.py.
 const ICON_KEYS: Array = ["player", "enemy", "objective", "city", "boat", "scout"]

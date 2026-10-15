@@ -11,7 +11,8 @@ assets/textures/units/<klucz>.png   256×256 — albedo materiału bryły
 | klucz | powierzchnia | trafia na |
 | --- | --- | --- |
 | `uniform` | tkanina munduru: splot, szew, kieszeń, pas | kapsuła piechura |
-| `armor` | blacha pancerza: spoiny, nity, właz, odpryski farby | kadłub i wieża pojazdu |
+| `armor` | blacha pancerza: spoiny, nity, właz, odpryski farby | kadłub, wieża pojazdu |
+| `track` | ogniwa gąsienicy z zębami prowadzącymi | gąsienice i koła pojazdów |
 
 Klucze są zgodne z `GameTextures.UNIT_KEYS` w `scripts/logic/game_textures.gd`
 i z `tools/art/process_units.py`.
@@ -50,8 +51,19 @@ no frame, fills the whole square edge to edge.*
 | --- | --- |
 | `uniform` | Seamless tileable texture of military fatigue fabric for a stylized 1970s Cold War game: coarse woven cotton-nylon cloth with subtle weave, a stitched seam, a small pouch flap and a strip of strap webbing crossing the surface, neutral light olive-grey so it can be tinted by a faction colour |
 | `armor` | Seamless tileable texture of painted armoured vehicle steel for a stylized 1970s Cold War game: welded steel plate with panel seams, a row of bolt heads, a small hatch rim, chipped paint and faint grime, neutral grey-green so it can be tinted by a faction colour |
+| `track` | Seamless tileable texture of a tank track run for a stylized 1970s Cold War game: steel track links with cleats, guide teeth and worn running surface, dust in the gaps, dark neutral steel-grey so it can be tinted by a faction colour |
+
+## Sylwetki
+
+`scripts/battle/battle_view.gd` składa pojazdy z brył: czołg ma 16 brył (kadłub,
+dwie gąsienice, pięć kół, wieżę, właz, lufę), a wóz bojowy 13 (gąsienice, cztery
+koła, wieżyczkę, lufę). Koła to walce obrócone osią w Z, więc toczą się
+w kierunku marszu (+X). Materiały: `armor` na kadłub i wieżę, `track` na
+gąsienice i koła, oba w barwie strony.
+
+Podgląd brył z wymiarami: `makieta_pojazdow.png` z `tools/art/preview_textures.py`.
 
 ## Do zrobienia
 
-Bryły pojazdów to nadal prostopadłościany i walce — tekstura jest malowana, ale
-sylwetka nie. Osobny etap: modele (gąsienice, koła, lufa) albo gotowe assety 3D.
+Kształty są kanciaste (bryły, nie siatki) — osobny etap: modele siatkowe
+(gąsienice, koła, lufa) albo gotowe assety 3D.

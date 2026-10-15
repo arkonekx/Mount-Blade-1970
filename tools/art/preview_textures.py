@@ -295,6 +295,153 @@ def icons_sheet(out_dir):
     print(f"arkusz ikon: {path} ({path.stat().st_size // 1024} kB, {sheet.width}×{sheet.height})")
 
 
+def _tinted(texture, color):
+    """Tekstura przemnożona przez kolor strony (jak albedo_color w Godocie)."""
+    from PIL import ImageChops
+    tint = Image.new("RGB", texture.size, tuple(round(c * 255) for c in color))
+    return ImageChops.multiply(texture.convert("RGB"), tint)
+
+
+def _draw_textured(canvas, shape, texture, points, color=(1.0, 1.0, 1.0), outline=(20, 22, 26), width=2):
+    """Rysuje bryłę: kształt wycięty z maski wypełniony teksturą w danym kolorze.
+
+    points: dla „rect” i „ellipse” dwa narożniki, dla „poly” lista wierzchołków.
+    """
+    if shape == "poly":
+        xs = [pt[0] for pt in points]
+        ys = [pt[1] for pt in points]
+        x0, y0 = int(min(xs)), int(min(ys))
+        x1, y1 = int(max(xs)) + 1, int(max(ys)) + 1
+    else:
+        # Kolejność narożników nie ma znaczenia — sortujemy.
+        xs = sorted((points[0][0], points[1][0]))
+        ys = sorted((points[0][1], points[1][1]))
+        x0, y0 = int(round(xs[0])), int(round(ys[0]))
+        x1, y1 = int(round(xs[1])), int(round(ys[1]))
+    mask = Image.new("L", (max(1, x1 - x0), max(1, y1 - y0)), 0)
+    pen = ImageDraw.Draw(mask)
+    if shape == "rect":
+        pen.rectangle([0, 0, mask.width - 1, mask.height - 1], fill=255)
+    elif shape == "ellipse":
+        pen.ellipse([0, 0, mask.width - 1, mask.height - 1], fill=255)
+    else:
+        pen.polygon([(pt[0] - x0, pt[1] - y0) for pt in points], fill=255)
+
+    tile = _tinted(texture, color).resize((mask.width, mask.height), Image.LANCZOS)
+    canvas.paste(tile, (x0, y0), mask)
+
+    draw = ImageDraw.Draw(canvas)
+    if shape == "rect":
+        draw.rectangle([x0, y0, x1 - 1, y1 - 1], outline=outline, width=width)
+    elif shape == "ellipse":
+        draw.ellipse([x0, y0, x1 - 1, y1 - 1], outline=outline, width=width)
+    else:
+        loop = points + [points[0]]
+        draw.line([tuple(pt) for pt in loop], fill=outline, width=width)
+
+
+def vehicles_mock(out_dir):
+    """Schemat brył pojazdów w skali — te same wymiary co battle_view.gd.
+
+    Widok z boku: rysujemy najpierw kadłub i wieżę, a na końcu gąsienicę z kołami,
+    bo bliższa gąsienica (z = ±1.6 m) zasłania bok kadłuba — tak samo widzi to
+    kamera w grze.
+    """
+    armor_tex = load_unit("armor")
+    track_tex = load_unit("track")
+    if armor_tex is None or track_tex is None:
+        print("makieta pojazdów: brak tekstur (pomiń)")
+        return
+
+    ppm = 44.0                      # pikseli na metr
+    center_x = 250                  # środek pojazdu w pikselach
+    tank_base = 330                 # linia jezdni czołgu
+    mech_base = 560
+    w, h = 1200, 640
+    SIDE = (0.25, 0.45, 0.90)       # barwa strony (jak sojusznik w grze)
+    TURRET = tuple(c * 0.8 for c in SIDE)
+    HATCH = tuple(c * 0.65 for c in SIDE)
+    BELT = (0.58, 0.58, 0.61)
+    WHEEL = (0.34, 0.34, 0.37)
+    GUN = (0.42, 0.42, 0.45)
+
+    canvas = Image.new("RGB", (w, h), BG)
+    draw = ImageDraw.Draw(canvas)
+    draw.text((22, 20), "Makieta pojazdów — bryły z battle_view.gd, skala 1:20",
+              font=ImageFont.truetype(FONT_BOLD, 32), fill=FG)
+    draw.text((24, 60), "te same wymiary i tekstury, które buduje kod · barwa strony "
+                        "mnożona przez teksturę · widok z boku (bliższa gąsienica na wierzchu)",
+              font=ImageFont.truetype(FONT, 17), fill=DIM)
+
+    def px(m):
+        return center_x + m * ppm
+
+    def py(m, base):
+        return base - m * ppm
+
+    def body(length, height, y_center, base, color):
+        _draw_textured(canvas, "rect", armor_tex,
+                       [(px(-length * 0.5), py(y_center + height * 0.5, base)),
+                        (px(length * 0.5), py(y_center - height * 0.5, base))], color=color)
+
+    def turret(center, width, height, y_bottom, base, barrel_from, barrel_to, barrel_y, top_color):
+        _draw_textured(canvas, "poly", armor_tex,
+                       [(px(center - width * 0.5), py(y_bottom + height, base)),
+                        (px(center + width * 0.5), py(y_bottom + height, base)),
+                        (px(center + width * 0.45), py(y_bottom, base)),
+                        (px(center - width * 0.5), py(y_bottom, base))], color=top_color)
+        _draw_textured(canvas, "rect", armor_tex,
+                       [(px(barrel_to), py(barrel_y + 0.07, base)),
+                        (px(barrel_from), py(barrel_y - 0.07, base))], color=GUN)
+
+    def running_gear(length, base, wheels, belt_top, belt_bottom):
+        _draw_textured(canvas, "rect", track_tex,
+                       [(px(-length * 0.5), py(belt_top, base)),
+                        (px(length * 0.5), py(belt_bottom, base))], color=BELT)
+        step = length / float(wheels + 1)
+        for i in range(1, wheels + 1):
+            cx = -length * 0.5 + step * float(i)
+            _draw_textured(canvas, "ellipse", track_tex,
+                           [(px(cx - 0.40), py(belt_top - 0.12, base)),
+                            (px(cx + 0.40), py(belt_bottom + 0.12, base))], color=WHEEL)
+
+    # --- czołg: kadłub 7.0×2.0 na y=1.1, gąsienica 7.4×1.1 na y=0.45, wieża 2.4 x 0.7 ---
+    body(7.0, 2.0, 1.1, tank_base, SIDE)
+    turret(0.2, 2.4, 0.7, 2.05, tank_base, 2.2, 5.8, 2.45, TURRET)
+    _draw_textured(canvas, "ellipse", armor_tex,
+                   [(px(-0.35), py(2.92, tank_base)), (px(0.35), py(2.72, tank_base))], color=HATCH)
+    running_gear(7.4, tank_base, 5, 1.0, -0.1)
+
+    # --- wóz bojowy: kadłub 6.0×1.9 na y=1.0, gąsienica 6.3×1.1, wieżyczka 1.7 x 0.5 ---
+    body(6.0, 1.9, 1.0, mech_base, SIDE)
+    turret(0.2, 1.7, 0.5, 1.9, mech_base, 1.5, 3.7, 2.2, TURRET)
+    running_gear(6.3, mech_base, 4, 1.0, -0.1)
+
+    # --- podpisy pod pojazdami ---
+    draw.text((px(-3.7), tank_base + 18), "czołg · 16 brył (M48A5, M60A1, T-55, T-72)",
+              font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
+    draw.text((px(-3.15), mech_base + 18), "wóz bojowy / transporter · 13 brył (M113, BMP-1, BTR-60)",
+              font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
+
+    # --- legenda części ---
+    note_x, y = 620, 120
+    for title, desc in [
+        ("kadłub", "prostopadłościan z blachą pancerza (barwa strony)"),
+        ("wieża + właz", "walce osadzone w układzie jednostki"),
+        ("lufa", "walec osią w +X, zwężony ku wylotowi"),
+        ("gąsienica", "prostopadłościan z teksturą ogniw"),
+        ("koła", "walce osią w Z — toczą się w kierunku +X"),
+        ("piechur (dla skali)", "kapsuła w mundurze + karabin: 2 bryły"),
+    ]:
+        draw.text((note_x, y), title, font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
+        draw.text((note_x, y + 24), desc, font=ImageFont.truetype(FONT, 16), fill=DIM)
+        y += 64
+
+    path = out_dir / "makieta_pojazdow.png"
+    canvas.save(path, "PNG")
+    print(f"makieta pojazdów: {path} ({path.stat().st_size // 1024} kB, {canvas.width}×{canvas.height})")
+
+
 def contact_sheet(out_dir):
     cell, pad, label_h, cols, head = 300, 18, 54, 3, 120
     rows = (len(KINDS) + cols - 1) // cols
@@ -429,6 +576,7 @@ def main():
     props_mock(out_dir)
     units_sheet(out_dir)
     icons_sheet(out_dir)
+    vehicles_mock(out_dir)
 
 
 if __name__ == "__main__":
