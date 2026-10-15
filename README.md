@@ -97,18 +97,28 @@ assets/textures/terrain/<klucz>.png        512×512  — teren: materiały 3D bi
 assets/textures/terrain/tiles/<klucz>.png   16×16   — teren: kafle mapy kampanii
 assets/textures/props/<klucz>.png          256×256  — otoczenie: pnie, korony,
                                                        skały, ściany i dachy
+assets/textures/units/<klucz>.png          256×256  — sprzęt: mundur i pancerz
+assets/textures/icons/<klucz>.png          128×128  — ikony mapy (RGBA)
 scripts/logic/game_textures.gd      loader tekstur (z zapasem na płaskie kolory)
 tools/art/pipeline.py               rdzeń: dopasowanie kolorystyki obrazu
 tools/art/process_terrain.py        surowe obrazy → kafle i materiały terenu
 tools/art/process_props.py          surowe obrazy → materiały otoczenia
+tools/art/process_units.py          surowe obrazy → materiały sprzętu
+tools/art/process_icons.py          surowe ikony → PNG z przezroczystością
 tools/art/preview_textures.py       arkusze kontaktowe + makiety
 assets/textures/*/README.md         palety, prompty, instrukcja odtworzenia
 ```
 
-Zestaw: 13 rodzajów terenu (kafle mapy i materiały gruntu bitwy) oraz 5 tekstur
-otoczenia bitwy — kora i korona drzew, skała, ściana bloku i dach. W bitwie
-drzewa, skały i budynki biorą materiały z `assets/textures/props/`, a przy
-braku pliku wracają do kolorów z `COLOR_*` w `battle_view.gd`.
+Zestaw: 13 rodzajów terenu (kafle mapy i materiały gruntu bitwy), 5 tekstur
+otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 2 tekstury
+sprzętu (mundur, pancerz) i 6 ikon mapy (gracz, wróg, cel, miasto, łódź,
+zwiadowca).
+
+Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez kolor strony
+(`albedo_color`): detal daje tekstura, a zielony gracz / niebiescy sojusznicy /
+czerwony wróg zostają czytelni. Ikony mają wycięte tło (alfa) i są projektowane
+pod skalę mapy — gruby obrys i prosta sylwetka. Przy braku któregokolwiek pliku
+gra wraca do płaskich kolorów i kształtów, więc nic się nie wywala.
 
 Tekstury są wczytywane przez `Image.load_from_file` (a nie `load("res://…")`),
 bo projekt bywa uruchamiany bez otwartego edytora (`--headless` w testach),

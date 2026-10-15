@@ -173,6 +173,20 @@ func _material(color: Color) -> StandardMaterial3D:
 	return material
 
 
+## Materiał jednostki: kolor strony × tekstura sprzętu (Godot mnoży albedo_color
+## przez teksturę), dzięki czemu detal pochodzi z tekstury, a przynależność do
+## strony pozostaje czytelna. Bez tekstury — sam kolor strony.
+func _material_side(texture: Texture2D, side_color: Color, uv_scale: Vector3 = Vector3.ONE) -> StandardMaterial3D:
+	if texture == null:
+		return _material(side_color)
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = texture
+	material.albedo_color = side_color
+	material.uv1_scale = uv_scale
+	material.roughness = 0.9
+	return material
+
+
 ## Materiał z teksturą (albo płaski kolor, gdy tekstury brak).
 func _material_for(texture: Texture2D, fallback: Color, uv_scale: Vector3 = Vector3.ONE) -> StandardMaterial3D:
 	if texture == null:
@@ -222,6 +236,12 @@ func _add_sphere(radius: float, color: Color, pos: Vector3, texture: Texture2D =
 
 func _build_units() -> void:
 	unit_nodes = []
+	# Tekstury sprzętu: mundur dla piechoty, pancerz dla pojazdów. Są jasne
+	# i neutralne, bo kolor strony jest mnożony w materiale (_material_side).
+	var uniform: Texture2D = GameTextures.unit("uniform")
+	var armor: Texture2D = GameTextures.unit("armor")
+	var uv_infantry := Vector3(1.5, 1.5, 1.5)
+	var uv_hull := Vector3(2.0, 1.0, 1.0)
 	for unit in sim.units:
 		var cls: String = str(unit["cls"])
 		var is_player: bool = bool(unit["is_player"])
@@ -235,7 +255,7 @@ func _build_units() -> void:
 			body.height = 1.7
 			var body_node := MeshInstance3D.new()
 			body_node.mesh = body
-			body_node.material_override = _material(color)
+			body_node.material_override = _material_side(uniform, color, uv_infantry)
 			body_node.position = Vector3(0, 0.85, 0)
 			node.add_child(body_node)
 			var rifle := BoxMesh.new()
@@ -250,7 +270,7 @@ func _build_units() -> void:
 			hull.size = Vector3(6.0, 1.9, 2.6)
 			var hull_node := MeshInstance3D.new()
 			hull_node.mesh = hull
-			hull_node.material_override = _material(color)
+			hull_node.material_override = _material_side(armor, color, uv_hull)
 			hull_node.position = Vector3(0, 1.0, 0)
 			node.add_child(hull_node)
 		else:
@@ -258,7 +278,7 @@ func _build_units() -> void:
 			hull.size = Vector3(7.0, 2.0, 3.2)
 			var hull_node := MeshInstance3D.new()
 			hull_node.mesh = hull
-			hull_node.material_override = _material(color)
+			hull_node.material_override = _material_side(armor, color, uv_hull)
 			hull_node.position = Vector3(0, 1.1, 0)
 			node.add_child(hull_node)
 			var turret := CylinderMesh.new()
@@ -267,7 +287,7 @@ func _build_units() -> void:
 			turret.height = 0.7
 			var turret_node := MeshInstance3D.new()
 			turret_node.mesh = turret
-			turret_node.material_override = _material(color.darkened(0.2))
+			turret_node.material_override = _material_side(armor, color.darkened(0.2), uv_hull)
 			turret_node.position = Vector3(0.2, 2.4, 0)
 			node.add_child(turret_node)
 		unit_nodes.append(node)

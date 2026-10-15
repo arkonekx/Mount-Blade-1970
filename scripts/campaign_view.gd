@@ -272,6 +272,18 @@ func _draw() -> void:
 	_draw_frame()
 
 
+## Rysuje ikonę AI wyśrodkowaną na polu mapy. Zwraca false, gdy tekstury brak
+## (wtedy wołający rysuje zapasowy kształt).
+func _draw_icon(key: String, cell: Vector2i, size: float, tint: Color = Color(1, 1, 1)) -> bool:
+	var texture: Texture2D = GameTextures.icon(key)
+	if texture == null:
+		return false
+	var center: Vector2 = MAP_ORIGIN + Vector2(cell) * TILE + Vector2(TILE * 0.5, TILE * 0.5)
+	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
+	draw_texture_rect(texture, rect, false, tint)
+	return true
+
+
 func _draw_frame() -> void:
 	draw_rect(Rect2(MAP_ORIGIN - Vector2(2, 2), Vector2(MAP_PIXEL_W + 4, MAP_PIXEL_H + 4)), Color(0.10, 0.11, 0.13), false, 2.0)
 
@@ -283,7 +295,8 @@ func _draw_cities() -> void:
 		if not campaign.fog.is_known(p.x, p.y):
 			continue
 		var pos: Vector2 = MAP_ORIGIN + Vector2(p) * TILE
-		draw_rect(Rect2(pos + Vector2(3, 3), Vector2(TILE - 6, TILE - 6)), Color(0.95, 0.92, 0.80))
+		if not _draw_icon("city", p, TILE + 6.0):
+			draw_rect(Rect2(pos + Vector2(3, 3), Vector2(TILE - 6, TILE - 6)), Color(0.95, 0.92, 0.80))
 		if campaign.fog.is_visible(p.x, p.y):
 			draw_string(font, pos + Vector2(4, -3), str(city["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.95, 0.95, 0.90))
 
@@ -294,6 +307,8 @@ func _draw_objectives() -> void:
 		var p := Vector2i(int(obj["x"]), int(obj["y"]))
 		var pos: Vector2 = MAP_ORIGIN + Vector2(p) * TILE + Vector2(TILE * 0.5, TILE * 0.5)
 		var color: Color = Color(0.95, 0.80, 0.20) if not bool(obj["owned"]) else Color(0.30, 0.95, 0.40)
+		if not _draw_icon("objective", p, TILE + 2.0, Color(1, 1, 1, 0.55 if bool(obj["owned"]) else 1.0)):
+			draw_arc(pos, TILE * 0.62, 0.0, TAU, 20, color, 2.0)
 		draw_arc(pos, TILE * 0.62, 0.0, TAU, 20, color, 2.0)
 		if not bool(obj["owned"]):
 			draw_string(font, pos + Vector2(6, 4), "%d/%d" % [int(obj["hold"]), int(Campaign.OBJECTIVE_HOLD_HOURS)], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1, 1, 1, 0.85))
@@ -303,6 +318,8 @@ func _draw_boats() -> void:
 	for boat in campaign.boats:
 		var p: Vector2i = boat["pos"]
 		if not campaign.fog.is_known(p.x, p.y):
+			continue
+		if _draw_icon("boat", p, TILE - 1.0):
 			continue
 		var pos: Vector2 = MAP_ORIGIN + Vector2(p) * TILE + Vector2(TILE * 0.5, TILE * 0.5)
 		draw_circle(pos, 3.5, Color(0.55, 0.85, 0.95))
@@ -327,6 +344,8 @@ func _draw_path() -> void:
 func _draw_enemies() -> void:
 	for enemy in campaign.visible_enemies():
 		var p: Vector2i = enemy["pos"]
+		if _draw_icon("enemy", p, TILE + 4.0):
+			continue
 		var pos: Vector2 = MAP_ORIGIN + Vector2(p) * TILE
 		draw_rect(Rect2(pos + Vector2(4, 4), Vector2(TILE - 8, TILE - 8)), Color(0.85, 0.22, 0.20))
 
@@ -336,16 +355,18 @@ func _draw_scout() -> void:
 		return
 	var p: Vector2i = campaign.scout["pos"]
 	var pos: Vector2 = MAP_ORIGIN + Vector2(p) * TILE + Vector2(TILE * 0.5, TILE * 0.5)
-	draw_circle(pos, 3.0, Color(0.95, 0.95, 0.95))
+	if not _draw_icon("scout", p, TILE + 2.0):
+		draw_circle(pos, 3.0, Color(0.95, 0.95, 0.95))
 	draw_arc(pos, 6.0, 0.0, TAU, 16, Color(0.95, 0.95, 0.95, 0.6), 1.0)
 
 
 func _draw_player() -> void:
 	var pos: Vector2 = MAP_ORIGIN + Vector2(campaign.position) * TILE + Vector2(TILE * 0.5, TILE * 0.5)
-	var points := PackedVector2Array([
-		pos + Vector2(0, -8), pos + Vector2(7, 7), pos + Vector2(0, 3), pos + Vector2(-7, 7),
-	])
-	draw_colored_polygon(points, Color(0.25, 0.95, 0.40))
+	if not _draw_icon("player", campaign.position, TILE + 8.0):
+		var points := PackedVector2Array([
+			pos + Vector2(0, -8), pos + Vector2(7, 7), pos + Vector2(0, 3), pos + Vector2(-7, 7),
+		])
+		draw_colored_polygon(points, Color(0.25, 0.95, 0.40))
 	draw_rect(Rect2(MAP_ORIGIN + Vector2(campaign.position) * TILE, Vector2(TILE, TILE)), Color(1, 1, 1, 0.35), false, 1.0)
 
 

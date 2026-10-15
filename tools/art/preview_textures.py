@@ -26,6 +26,16 @@ PROJECT = pathlib.Path(__file__).resolve().parents[2]
 TERRAIN = PROJECT / "assets" / "textures" / "terrain"
 TILES = TERRAIN / "tiles"
 PROPS = PROJECT / "assets" / "textures" / "props"
+UNITS = PROJECT / "assets" / "textures" / "units"
+ICONS = PROJECT / "assets" / "textures" / "icons"
+
+# Kolory stron z battle_view.gd — tekstury sprzętu są mnożone przez ten kolor.
+SIDE_COLORS = [("gracz", (0.25, 0.90, 0.35)), ("sojusznik", (0.25, 0.45, 0.90)), ("wróg", (0.85, 0.20, 0.20))]
+UNIT_KINDS = [("uniform", "mundur piechoty"), ("armor", "pancerz pojazdu")]
+ICON_KINDS = [
+    ("player", "gracz"), ("enemy", "wróg"), ("objective", "cel"),
+    ("city", "miasto"), ("boat", "łódź"), ("scout", "zwiadowca"),
+]
 
 # Klucze i kolory otoczenia — jak w tools/art/process_props.py i game_textures.gd.
 PROP_KINDS = [
@@ -180,6 +190,111 @@ def props_mock(out_dir):
     print(f"makieta otoczenia: {path} ({path.stat().st_size // 1024} kB, {canvas.width}×{canvas.height})")
 
 
+def load_unit(key, size=None):
+    path = UNITS / f"{key}.png"
+    if not path.exists():
+        return None
+    img = Image.open(path).convert("RGB")
+    return img.resize((size, size), Image.LANCZOS) if size else img
+
+
+def load_icon(key, size=None):
+    path = ICONS / f"{key}.png"
+    if not path.exists():
+        return None
+    img = Image.open(path).convert("RGBA")
+    return img.resize((size, size), Image.LANCZOS) if size else img
+
+
+def units_sheet(out_dir):
+    """Tekstury sprzętu: sam detal i ten sam detal w barwach trzech stron."""
+    cell, pad, label_h, head = 260, 16, 46, 190
+    tiles = 1 + len(SIDE_COLORS)
+    width = pad + tiles * (cell + pad)
+    height = head + 2 * (cell + label_h + pad)
+    sheet = Image.new("RGB", (width, height), BG)
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad + 4, 22), "Zimna Wojna 1975 — jednostki i pojazdy (AI)",
+              font=ImageFont.truetype(FONT_BOLD, 34), fill=FG)
+    draw.text((pad + 6, 68), "256×256 · jasna, neutralna tekstura × kolor strony "
+                             "(Godot mnoży albedo_color przez teksturę)",
+              font=ImageFont.truetype(FONT, 18), fill=DIM)
+    for i, (label, rgb) in enumerate(SIDE_COLORS):
+        x = pad + (i + 1) * (cell + pad)
+        draw.rectangle([x, 104, x + 22, 126], fill=tuple(round(c * 255) for c in rgb))
+        draw.text((x + 30, 104), f"barwa: {label}", font=ImageFont.truetype(FONT_BOLD, 19), fill=FG)
+
+    for row, (key, name) in enumerate(UNIT_KINDS):
+        texture = load_unit(key, cell)
+        y = head + row * (cell + label_h + pad)
+        if texture is not None:
+            sheet.paste(texture, (pad, y))
+            draw.rectangle([pad, y, pad + cell - 1, y + cell - 1], outline=(70, 74, 80))
+            draw.text((pad + 2, y + cell + 8), f"{name} · {key} (bez barwy)",
+                      font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
+        for i, (label, rgb) in enumerate(SIDE_COLORS):
+            x = pad + (i + 1) * (cell + pad)
+            if texture is None:
+                draw.rectangle([x, y, x + cell, y + cell], fill=tuple(round(c * 200) for c in rgb))
+                continue
+            tint = Image.new("RGB", texture.size, tuple(round(c * 255) for c in rgb))
+            from PIL import ImageChops
+            tinted = ImageChops.multiply(texture, tint)
+            sheet.paste(tinted, (x, y))
+            draw.rectangle([x, y, x + cell - 1, y + cell - 1], outline=(70, 74, 80))
+            draw.text((x + 2, y + cell + 8), f"{name} · {label}", font=ImageFont.truetype(FONT, 19), fill=DIM)
+
+    path = out_dir / "arkusz_jednostek.png"
+    sheet.save(path, "PNG")
+    print(f"arkusz jednostek: {path} ({path.stat().st_size // 1024} kB, {sheet.width}×{sheet.height})")
+
+
+def icons_sheet(out_dir):
+    """Ikony: w rozmiarze docelowym i tak, jak trafiają na mapę (24 i 16 px)."""
+    big, small_a, small_b = 128, 24, 16
+    pad, head = 18, 150
+    cell_w = big + 30
+    cell_h = big + 104
+    cols = 3
+    rows = (len(ICON_KINDS) + cols - 1) // cols
+    sheet = Image.new("RGB", (pad + cols * (cell_w + pad), head + rows * (cell_h + pad)), BG)
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad + 4, 22), "Zimna Wojna 1975 — ikony interfejsu (AI)",
+              font=ImageFont.truetype(FONT_BOLD, 34), fill=FG)
+    draw.text((pad + 6, 66), "128×128 z przezroczystością · wycięte z magentowego tła · "
+                             "poniżej podgląd w skali mapy (24 i 16 px na tle terenu)",
+              font=ImageFont.truetype(FONT, 18), fill=DIM)
+
+    # pasek tła terenu, żeby ocenić kontrast ikon w skali mapy
+    strip = load("plains", 32)
+    if strip is not None:
+        for sx in range(pad, sheet.width - pad, 32):
+            sheet.paste(strip, (sx, 104))
+
+    for index, (key, name) in enumerate(ICON_KINDS):
+        col = index % cols
+        row = index // cols
+        x = pad + col * (cell_w + pad)
+        y = head + row * (cell_h + pad)
+        icon = load_icon(key, big)
+        draw.rectangle([x, y, x + big - 1, y + big - 1], fill=(16, 18, 22))
+        if icon is not None:
+            sheet.paste(icon, (x, y), icon)
+        else:
+            draw.text((x + 10, y + 10), "BRAK", font=ImageFont.truetype(FONT, 20), fill=(210, 170, 90))
+        draw.text((x + 2, y + big + 6), f"{name} · {key}", font=ImageFont.truetype(FONT_BOLD, 24), fill=FG)
+        for i, size in enumerate((small_a, small_b)):
+            thumb = load_icon(key, size)
+            if thumb is not None:
+                sheet.paste(thumb, (x + 2 + i * 46, y + big + 44), thumb)
+        draw.text((x + 104, y + big + 50), "24 px · 16 px (skala mapy)",
+                  font=ImageFont.truetype(FONT, 17), fill=DIM)
+
+    path = out_dir / "arkusz_ikon.png"
+    sheet.save(path, "PNG")
+    print(f"arkusz ikon: {path} ({path.stat().st_size // 1024} kB, {sheet.width}×{sheet.height})")
+
+
 def contact_sheet(out_dir):
     cell, pad, label_h, cols, head = 300, 18, 54, 3, 120
     rows = (len(KINDS) + cols - 1) // cols
@@ -244,14 +359,32 @@ def campaign_map_preview(out_dir, seed):
 
     f_small = ImageFont.truetype(FONT_BOLD, 11)
     f_mark = ImageFont.truetype(FONT_BOLD, 13)
+
+    # Ikony AI nanoszone tak, jak robi to campaign_view.gd (miasta, gracz, wrogowie).
+    def paste_icon(key, cell_x, cell_y, size):
+        icon = load_icon(key, size)
+        if icon is None:
+            return False
+        x = cell_x * scale + (scale - size) // 2
+        y = cell_y * scale + (scale - size) // 2
+        map_img.paste(icon, (x, y), icon)
+        return True
+
     for city in entry["cities"]:
         cx, cy = int(city["x"]) * scale, int(city["y"]) * scale
-        draw.rectangle([cx + 1, cy + 1, cx + scale - 2, cy + scale - 2], outline=(250, 245, 210), width=1)
+        paste_icon("city", int(city["x"]), int(city["y"]), scale + 6)
         draw.text((cx + 2, cy - 12), city["name"], font=f_small, fill=(252, 250, 235),
                   stroke_width=2, stroke_fill=(20, 20, 20))
+
+    # przykładowe znaczniki: wrogowie i zwiadowca (żeby pokazać zestaw ikon)
+    demo_marks = [("enemy", 34, 12), ("enemy", 47, 33), ("scout", 26, 30)]
+    for key, gx, gy in demo_marks:
+        paste_icon(key, gx, gy, scale + 4)
+
     sx, sy = int(entry["start"][0]), int(entry["start"][1])
     draw.ellipse([sx * scale - 4, sy * scale - 4, sx * scale + scale + 4, sy * scale + scale + 4],
-                 outline=(90, 240, 120), width=3)
+                 outline=(90, 240, 120), width=2)
+    paste_icon("player", sx, sy, scale + 8)
     draw.text((sx * scale + 2, sy * scale + scale + 4), "start", font=f_mark, fill=(140, 250, 160),
               stroke_width=2, stroke_fill=(15, 15, 15))
 
@@ -261,7 +394,8 @@ def campaign_map_preview(out_dir, seed):
     draw = ImageDraw.Draw(canvas)
     draw.text((16, 18), f"Mapa kampanii 60×40 — seed {seed}, kafle {scale} px",
               font=ImageFont.truetype(FONT_BOLD, 30), fill=FG)
-    draw.text((16, 56), "prawdziwe dane z tests/ref_map.json, złożone z nowych tekstur",
+    draw.text((16, 56), "prawdziwe dane z tests/ref_map.json + tekstury i ikony AI "
+                        "(wrogowie i zwiadowca to znaczniki przykładowe)",
               font=ImageFont.truetype(FONT, 17), fill=DIM)
 
     x0, y = map_img.width + 22, head + 20
@@ -293,6 +427,8 @@ def main():
     campaign_map_preview(out_dir, args.seed)
     props_sheet(out_dir)
     props_mock(out_dir)
+    units_sheet(out_dir)
+    icons_sheet(out_dir)
 
 
 if __name__ == "__main__":

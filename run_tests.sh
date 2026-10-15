@@ -5,8 +5,8 @@
 #   GODOT=/ścieżka/do/Godot ./run_tests.sh
 #
 # Skrypt uruchamia sześć testów logiki (test_map, test_campaign, test_battle,
-# test_save, test_playthrough, test_textures), a potem obie sceny
-# (campaign i battle) i szuka w nich "SCRIPT ERROR".
+# test_save, test_playthrough, test_textures), a potem obie sceny oraz testy
+# tekstur; szuka też "SCRIPT ERROR" w wyjściu scen.
 
 set -u
 

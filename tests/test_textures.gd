@@ -1,8 +1,8 @@
 extends SceneTree
-## Test tekstur gry: wszystkie 13 kafli terenu musi istnieć i mieć rozmiar 16×16,
-## materiały terenu 512×512, a tekstury otoczenia bitwy (drzewa, skały, budynki)
-## 256×256. Pilnuje też nazw plików, powiązanych z `Terrain.Kind` i z obiektami
-## budowanymi w `battle_view.gd`.
+## Test tekstur gry: kafle terenu 16×16, materiały terenu 512×512, tekstury
+## otoczenia i sprzętu 256×256 oraz ikony interfejsu 128×128 z przezroczystym
+## tłem. Pilnuje też nazw plików, powiązanych z `Terrain.Kind` i z obiektami
+## budowanymi w `battle_view.gd` oraz rysowanymi w `campaign_view.gd`.
 
 const Terrain = preload("res://scripts/logic/terrain.gd")
 const GameTextures = preload("res://scripts/logic/game_textures.gd")
@@ -37,6 +37,24 @@ func _initialize() -> void:
 				"Tekstura otoczenia %s ma rozmiar %d×%d, a materiały używają 256×256"
 				% [str(key), prop_texture.get_width(), prop_texture.get_height()])
 	_check(GameTextures.all_props_available(), "Nie wszystkie tekstury otoczenia są dostępne")
+	for key in GameTextures.UNIT_KEYS:
+		var unit_texture: Texture2D = GameTextures.unit(str(key))
+		_check(unit_texture != null, "Brak tekstury sprzętu %s" % str(key))
+		if unit_texture != null:
+			_check(unit_texture.get_width() == 256 and unit_texture.get_height() == 256,
+				"Tekstura sprzętu %s ma rozmiar %d×%d, a materiały używają 256×256"
+				% [str(key), unit_texture.get_width(), unit_texture.get_height()])
+	_check(GameTextures.all_units_available(), "Nie wszystkie tekstury sprzętu są dostępne")
+	for key in GameTextures.ICON_KEYS:
+		var icon_texture: Texture2D = GameTextures.icon(str(key))
+		_check(icon_texture != null, "Brak ikony %s" % str(key))
+		if icon_texture != null:
+			_check(icon_texture.get_width() == 128 and icon_texture.get_height() == 128,
+				"Ikona %s ma rozmiar %d×%d, a interfejs używa 128×128"
+				% [str(key), icon_texture.get_width(), icon_texture.get_height()])
+			_check(icon_texture.get_image().detect_alpha() != Image.ALPHA_NONE,
+				"Ikona %s nie ma przezroczystości (tło powinno być wycięte)" % str(key))
+	_check(GameTextures.all_icons_available(), "Nie wszystkie ikony są dostępne")
 	_check(GameTextures.load_error() == "", "Loader tekstur zgłosił błąd: %s" % GameTextures.load_error())
 	_report()
 

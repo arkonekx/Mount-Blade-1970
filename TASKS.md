@@ -72,8 +72,19 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
       skrót wszystkich plików terenu identyczny przed i po
 - [x] `scripts/logic/game_textures.gd` obsługuje teren i otoczenie,
       `tests/test_textures.gd` pilnuje obu zestawów
-- [ ] tekstury samych jednostek i pojazdów (żołnierze, czołgi, transportery)
-- [ ] ikony interfejsu (HUD kampanii i bitwy)
+- [x] 2 tekstury sprzętu (256×256): mundur piechoty i pancerz pojazdu — jasne
+      i neutralne, bo materiał mnoży je przez kolor strony, więc gracz/sojusznik/wróg
+      zostają rozróżnialni, a detal pochodzi z tekstury
+- [x] 6 ikon mapy (128×128, RGBA): gracz, wróg, cel, miasto, łódź, zwiadowca —
+      wycięte z magentowego tła (`tools/art/process_icons.py`) z usunięciem
+      różowej obwódki, przycięte do treści i przeskalowane pod skalę mapy
+- [x] `campaign_view.gd` rysuje ikony, a przy braku pliku wraca do dawnych
+      kształtów (trójkąt gracza, kwadrat wroga, kółko łodzi itd.)
+- [x] `battle_view.gd` daje piechurom mundur, a pojazdom pancerz (materiał:
+      tekstura × kolor strony); `tests/test_textures.gd` pilnuje obu zestawów,
+      w tym przezroczystości ikon
+- [ ] sylwetki pojazdów (modele: gąsienice, koła, lufa) — obecnie bryły z teksturą
+- [ ] ikony HUD (pasek stanu, broń, cele) — na razie tylko znaczniki na mapie
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
 
@@ -99,8 +110,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 1. **Do potwierdzenia przez użytkownika**
    - Dowódca to osobny piechur, nie gracz — tak jest zaimplementowane.
    - Śmierć gracza kończy bitwę porażką, nawet gdy sojusznicy żyją — tak jest zaimplementowane.
-2. **Tekstury jednostek i ikon (AI)** — teren i otoczenie bitwy gotowe (etap 7);
-   do zrobienia pozostają żołnierze, pojazdy i ikony HUD.
+2. **Grafika (AI)** — teren, otoczenie bitwy, sprzęt i ikony mapy gotowe (etap 7);
+   zostają modele pojazdów (dziś bryły z dobrą teksturą) i ikony samego HUD.
 3. **Dźwięk** — do przeniesienia z wersji TypeScript (nie ma go w tym repo).
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.

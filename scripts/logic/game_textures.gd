@@ -15,6 +15,8 @@ extends RefCounted
 const TERRAIN_DIR := "res://assets/textures/terrain"
 const TILE_DIR := TERRAIN_DIR + "/tiles"
 const PROP_DIR := "res://assets/textures/props"
+const UNIT_DIR := "res://assets/textures/units"
+const ICON_DIR := "res://assets/textures/icons"
 
 ## Klucze w kolejności `Terrain.Kind` z scripts/logic/terrain.gd.
 const KEYS: Array = [
@@ -26,9 +28,17 @@ const KEYS: Array = [
 ## tools/art/process_props.py.
 const PROP_KEYS: Array = ["tree_bark", "tree_canopy", "rock", "wall", "roof"]
 
+## Klucze tekstur sprzętu (są jasne i neutralne, bo w grze mnoży je kolor strony).
+const UNIT_KEYS: Array = ["uniform", "armor"]
+
+## Klucze ikon interfejsu — kolejność jak w tools/art/process_icons.py.
+const ICON_KEYS: Array = ["player", "enemy", "objective", "city", "boat", "scout"]
+
 static var _masters: Dictionary = {}
 static var _tiles: Dictionary = {}
 static var _props: Dictionary = {}
+static var _units: Dictionary = {}
+static var _icons: Dictionary = {}
 
 
 ## Tekstura 512×512 dla materiału 3D (albo null, gdy pliku brak).
@@ -43,18 +53,47 @@ static func tile(kind: int) -> Texture2D:
 
 ## Tekstura otoczenia bitwy (albo null, gdy pliku brak).
 static func prop(key: String) -> Texture2D:
-	if _props.has(key):
-		return _props[key]
-	var path: String = "%s/%s.png" % [PROP_DIR, key]
+	return _load_named(_props, PROP_DIR, key)
+
+
+## Wspólne wczytywanie nazwanej tekstury (z pamięcią podręczną i ostrzeżeniem).
+static func _load_named(cache: Dictionary, directory: String, key: String) -> Texture2D:
+	if cache.has(key):
+		return cache[key]
+	var path: String = "%s/%s.png" % [directory, key]
 	var image := Image.load_from_file(ProjectSettings.globalize_path(path))
 	if image == null:
 		_last_error = "Nie wczytano tekstury %s" % path
 		push_warning(_last_error)
-		_props[key] = null
+		cache[key] = null
 		return null
 	var texture := ImageTexture.create_from_image(image)
-	_props[key] = texture
+	cache[key] = texture
 	return texture
+
+
+## Tekstura sprzętu (mundur piechoty, pancerz pojazdu) albo null.
+static func unit(key: String) -> Texture2D:
+	return _load_named(_units, UNIT_DIR, key)
+
+
+## Ikona interfejsu (RGBA, wycięta z tła) albo null.
+static func icon(key: String) -> Texture2D:
+	return _load_named(_icons, ICON_DIR, key)
+
+
+static func all_units_available() -> bool:
+	for key in UNIT_KEYS:
+		if unit(str(key)) == null:
+			return false
+	return true
+
+
+static func all_icons_available() -> bool:
+	for key in ICON_KEYS:
+		if icon(str(key)) == null:
+			return false
+	return true
 
 
 ## Czy wszystkie tekstury otoczenia są dostępne (używane przez testy).
