@@ -83,17 +83,27 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `battle_view.gd` daje piechurom mundur, a pojazdom pancerz (materiał:
       tekstura × kolor strony); `tests/test_textures.gd` pilnuje obu zestawów,
       w tym przezroczystości ikon
-- [x] sylwetki pojazdów: czołg 16 brył (kadłub, dwie gąsienice, pięć kół,
-      wieża z włazem, lufa), wóz bojowy 13 brył (gąsienice, cztery koła,
-      wieżyczka, lufa) — koła to walce obrócone osią w Z, więc toczą się w +X
+- [x] sylwetki pojazdów z 256/128 brył, wzorowane na prawdziwych wozach 1975:
+      czołg 256 brył (pochyła płyta pancerza, błotniki z fartuchami, gąsienice
+      z ogniwami, 5 kół jezdnych + rolki powrotne na stronę, wieża z jarzmem,
+      lufa z wylotem, włazy, anteny, reflektory, narzędzia, beczki/zasobniki),
+      wóz bojowy 128 brył, piechur 10 brył (ciało, hełm, plecak, kończyny, broń)
+- [x] dwa warianty sylwetki: NATO (wieża skrzynkowa — M48A5/M60A1) i ZSRR
+      (kopuła odlewana — T-55/T-62), wybierane po stronie jednostki
+- [x] wspólne materiały brył (`_material_cache` w `battle_view.gd`) — bitwa
+      z tysiącem brył tworzy ~30 materiałów zamiast ~2300
 - [x] tekstura ogniw gąsienicy (3. tekstura sprzętu, `track`)
-- [x] `tests/test_views.gd` — składa obie sceny jak gra i sprawdza liczbę brył
-      w sylwetkach (piechur ≥ 2, wóz ≥ 12, czołg ≥ 14) oraz to, że materiały
-      naprawdę mają tekstury AI
+- [x] `tests/test_views.gd` — składa obie sceny jak gra i sprawdza dokładną
+      liczbę brył sylwetek (piechur 10, wóz 128, czołg 256), różnice między
+      wariantami NATO/ZSRR, to że materiały naprawdę mają tekstury AI i że są
+      dzielone (≤ 64 unikalnych materiałów w scenie bitwy)
 - [x] podgląd brył bez okna graficznego: `tools/godot/dump_meshes.gd` zrzuca
-      geometrię z `battle_view.gd` (16/13/2 bryły), a `tools/art/render_units.py`
+      geometrię z `battle_view.gd` (256/128/10 brył), a `tools/art/render_units.py`
       renderuje ją w Pythonie (numpy + Pillow) — kształt, barwy i tekstury 1:1
       z gry, oświetlenie i rzut są przybliżeniem
+- [x] `makieta_pojazdow.png` to rzut techniczny **prawdziwych brył** z tego
+      zrzutu (rysowany w `preview_textures.py`), więc nie może się rozjechać
+      z kodem
 - [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)

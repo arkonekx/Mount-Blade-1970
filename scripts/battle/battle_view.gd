@@ -171,9 +171,20 @@ func _ground_color(terrain_kind: String) -> Color:
 			return Color(0.34, 0.48, 0.26)
 
 
+## Materiały są wspólne dla wszystkich brył o tym samym wyglądzie — przy
+## sylwetkach z setek brył bez cache’a powstałyby tysiące identycznych
+## materiałów (i tyle samo wywołań rysowania). Materiałów nigdy nie
+## modyfikujemy po utworzeniu, więc dzielenie ich jest bezpieczne.
+var _material_cache: Dictionary = {}
+
+
 func _material(color: Color) -> StandardMaterial3D:
+	var key := "flat:%s" % color.to_html()
+	if _material_cache.has(key):
+		return _material_cache[key]
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
+	_material_cache[key] = material
 	return material
 
 
@@ -183,11 +194,15 @@ func _material(color: Color) -> StandardMaterial3D:
 func _material_side(texture: Texture2D, side_color: Color, uv_scale: Vector3 = Vector3.ONE) -> StandardMaterial3D:
 	if texture == null:
 		return _material(side_color)
+	var key := "side:%d:%s:%s" % [texture.get_instance_id(), side_color.to_html(), str(uv_scale)]
+	if _material_cache.has(key):
+		return _material_cache[key]
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
 	material.albedo_color = side_color
 	material.uv1_scale = uv_scale
 	material.roughness = 0.9
+	_material_cache[key] = material
 	return material
 
 
@@ -195,10 +210,14 @@ func _material_side(texture: Texture2D, side_color: Color, uv_scale: Vector3 = V
 func _material_for(texture: Texture2D, fallback: Color, uv_scale: Vector3 = Vector3.ONE) -> StandardMaterial3D:
 	if texture == null:
 		return _material(fallback)
+	var key := "tex:%d:%s" % [texture.get_instance_id(), str(uv_scale)]
+	if _material_cache.has(key):
+		return _material_cache[key]
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
 	material.uv1_scale = uv_scale
 	material.roughness = 0.95
+	_material_cache[key] = material
 	return material
 
 
@@ -238,132 +257,448 @@ func _add_sphere(radius: float, color: Color, pos: Vector3, texture: Texture2D =
 	return node
 
 
+## Sylwetki jednostek są składane z brył, ale tak, żeby przypominały prawdziwe
+## pojazdy z 1975 roku: pochyły pancerz czołowy, błotniki z fartuchami, gąsienice
+## z osobnych ogniw, koła jezdne z piastą i felgą, koło napędowe i napinające,
+## koła podtrzymujące, wieża kopułowa (ZSRR) albo kanciasta (USA), jarzmo, lufa
+## z przedmuchiwaczem i wylotem, włazy, km przeciwlotniczy, reflektory, anteny,
+## wydechy, narzędzia, zbiorniki paliwa (ZSRR) albo skrzynie (USA) i zapasowe
+## ogniwa na pancerzu.
+##
+## Liczba brył jest stała i pilnuje jej tests/test_views.gd:
+## czołg 256, wóz bojowy 128, piechur 10.
+const ARMOR_PARTS := 256
+const MECH_PARTS := 128
+const INFANTRY_PARTS := 10
+
+## Tony barwy strony: 0 = barwa strony, większe = ciemniejsze, -1 = ciemny metal.
+const TONE_BODY := 0.0
+const TONE_DARK := 0.3
+const TONE_DEEP := 0.55
+const TONE_TRACK := 0.5
+const TONE_WHEEL := 0.68
+const TONE_METAL := -1.0
+
+const TRACK_UV := Vector3(0.6, 1.0, 1.0)
+const PLAIN_UV := Vector3(1.0, 1.0, 1.0)
+const HULL_UV := Vector3(2.0, 1.0, 1.0)
+
+
 func _build_units() -> void:
 	unit_nodes = []
-	# Tekstury sprzętu: mundur dla piechoty, pancerz i gąsienica dla pojazdów.
-	# Są jasne i neutralne, bo kolor strony jest mnożony w materiale (_material_side).
-	var uniform: Texture2D = GameTextures.unit("uniform")
-	var armor: Texture2D = GameTextures.unit("armor")
-	var track: Texture2D = GameTextures.unit("track")
+	# Tekstury: mundur dla piechoty, pancerz i gąsienice dla pojazdów. Są jasne
+	# i neutralne, bo kolor strony jest mnożony w materiale (_material_side).
+	var textures: Dictionary = {
+		"uniform": GameTextures.unit("uniform"),
+		"armor": GameTextures.unit("armor"),
+		"track": GameTextures.unit("track"),
+	}
 	for unit in sim.units:
 		var cls: String = str(unit["cls"])
 		var is_player: bool = bool(unit["is_player"])
 		var color: Color = COLOR_PLAYER if is_player else (COLOR_FRIEND if bool(unit["side"]) else COLOR_ENEMY)
+		var variant: String = "su" if UnitsData.side_of(str(unit["def_id"])) == "su" else "us"
 		var node := Node3D.new()
 		node.name = "unit_%d" % unit_nodes.size()
 		add_child(node)
 		if cls == UnitsData.CLS_INFANTRY:
-			_build_infantry(node, color, uniform)
+			_build_infantry(node, color, textures["uniform"])
 		elif cls == UnitsData.CLS_MECH:
-			_build_mech(node, color, armor, track)
+			_instantiate_parts(node, _mech_parts(variant), color, textures)
 		else:
-			_build_armor(node, color, armor, track)
+			_instantiate_parts(node, _tank_parts(variant), color, textures)
 		unit_nodes.append(node)
 
 
-## Piechur: kapsuła w mundurze + karabin.
+## Piechur: hełm, tors, plecak, ręce, nogi i karabin (10 brył).
 func _build_infantry(node: Node3D, color: Color, uniform: Texture2D) -> void:
+	var uv := Vector3(1.5, 1.5, 1.5)
 	var body := CapsuleMesh.new()
-	body.radius = 0.4
-	body.height = 1.7
+	body.radius = 0.32
+	body.height = 1.2
 	var body_node := MeshInstance3D.new()
 	body_node.mesh = body
-	body_node.material_override = _material_side(uniform, color, Vector3(1.5, 1.5, 1.5))
-	body_node.position = Vector3(0, 0.85, 0)
+	body_node.material_override = _material_side(uniform, color, uv)
+	body_node.position = Vector3(0, 1.05, 0)
 	node.add_child(body_node)
+
+	var helmet := SphereMesh.new()
+	helmet.radius = 0.22
+	helmet.height = 0.36
+	var helmet_node := MeshInstance3D.new()
+	helmet_node.mesh = helmet
+	helmet_node.material_override = _material_side(uniform, color.darkened(TONE_DEEP), uv)
+	helmet_node.position = Vector3(0, 1.72, 0)
+	node.add_child(helmet_node)
+
+	var pack := BoxMesh.new()
+	pack.size = Vector3(0.3, 0.42, 0.5)
+	var pack_node := MeshInstance3D.new()
+	pack_node.mesh = pack
+	pack_node.material_override = _material_side(uniform, color.darkened(TONE_DARK), uv)
+	pack_node.position = Vector3(-0.26, 1.2, 0)
+	node.add_child(pack_node)
+
+	for side in [-1.0, 1.0]:
+		var arm := BoxMesh.new()
+		arm.size = Vector3(0.16, 0.6, 0.16)
+		var arm_node := MeshInstance3D.new()
+		arm_node.mesh = arm
+		arm_node.material_override = _material_side(uniform, color.darkened(TONE_DARK), uv)
+		arm_node.position = Vector3(0.06, 1.15, side * 0.3)
+		arm_node.rotation = Vector3(0.0, 0.0, side * 0.15)
+		node.add_child(arm_node)
+		var leg := BoxMesh.new()
+		leg.size = Vector3(0.2, 0.85, 0.2)
+		var leg_node := MeshInstance3D.new()
+		leg_node.mesh = leg
+		leg_node.material_override = _material_side(uniform, color.darkened(TONE_DEEP), uv)
+		leg_node.position = Vector3(0.0, 0.45, side * 0.14)
+		node.add_child(leg_node)
+		var pouch := BoxMesh.new()
+		pouch.size = Vector3(0.18, 0.22, 0.12)
+		var pouch_node := MeshInstance3D.new()
+		pouch_node.mesh = pouch
+		pouch_node.material_override = _material_side(uniform, color.darkened(TONE_DEEP), uv)
+		pouch_node.position = Vector3(0.2, 0.95, side * 0.26)
+		node.add_child(pouch_node)
 
 	var rifle := BoxMesh.new()
 	rifle.size = Vector3(1.1, 0.12, 0.12)
 	var rifle_node := MeshInstance3D.new()
 	rifle_node.mesh = rifle
 	rifle_node.material_override = _material(METAL_DARK)
-	rifle_node.position = Vector3(0.5, 1.30, 0)
+	rifle_node.position = Vector3(0.5, 1.30, 0.26)
 	node.add_child(rifle_node)
 
 
-## Czołg: kadłub, dwie gąsienice z kołami, wieża z włazem i lufą.
-func _build_armor(node: Node3D, color: Color, armor: Texture2D, track: Texture2D) -> void:
-	_add_vehicle_hull(node, Vector3(7.0, 2.0, 3.2), 1.1, color, armor)
-	_add_tracks(node, 7.4, 1.6, 5, color, track)
-	_add_local_cylinder(node, 1.1, 1.3, 0.7, Vector3(0.2, 2.4, 0), color.darkened(0.2), armor, Vector3(2.0, 1.0, 1.0))
-	_add_local_cylinder(node, 0.35, 0.35, 0.14, Vector3(0.0, 2.85, 0), color.darkened(0.35), armor, Vector3(1.0, 1.0, 1.0))
-	_add_barrel(node, Vector3(2.2, 2.45, 0.0), 3.6, 0.12)
+# --- opisy brył ---------------------------------------------------------------
 
 
-## Bojowy wóz piechoty albo transporter: mniejszy kadłub, gąsienice, mała wieżyczka.
-func _build_mech(node: Node3D, color: Color, armor: Texture2D, track: Texture2D) -> void:
-	_add_vehicle_hull(node, Vector3(6.0, 1.9, 2.6), 1.0, color, armor)
-	_add_tracks(node, 6.3, 1.35, 4, color, track)
-	_add_local_cylinder(node, 0.75, 0.85, 0.5, Vector3(0.3, 2.15, 0), color.darkened(0.2), armor, Vector3(1.5, 1.0, 1.0))
-	_add_barrel(node, Vector3(1.5, 2.2, 0.0), 2.2, 0.09)
+## Jedna bryła sylwetki: prostopadłościan (`box`) albo walec (`cyl`).
+func _part_box(size: Vector3, pos: Vector3, rot: Vector3, tone: float, tex: String,
+		uv: Vector3 = PLAIN_UV, shadow: bool = true) -> Dictionary:
+	return {"prim": "box", "size": size, "pos": pos, "rot": rot,
+		"tone": tone, "tex": tex, "uv": uv, "shadow": shadow}
 
 
-## Kadłub pojazdu: prostopadłościan z blachą pancerza w barwie strony.
-func _add_vehicle_hull(node: Node3D, size: Vector3, y: float, color: Color, armor: Texture2D) -> void:
-	var hull := BoxMesh.new()
-	hull.size = size
-	var hull_node := MeshInstance3D.new()
-	hull_node.mesh = hull
-	hull_node.material_override = _material_side(armor, color, Vector3(2.0, 1.0, 1.0))
-	hull_node.position = Vector3(0, y, 0)
-	node.add_child(hull_node)
+func _part_cyl(top: float, bottom: float, height: float, segments: int, pos: Vector3,
+		rot: Vector3, tone: float, tex: String, uv: Vector3 = PLAIN_UV,
+		shadow: bool = true) -> Dictionary:
+	return {"prim": "cyl", "top": top, "bottom": bottom, "height": height, "seg": segments,
+		"pos": pos, "rot": rot, "tone": tone, "tex": tex, "uv": uv, "shadow": shadow}
 
 
-## Dwie gąsienice po bokach kadłuba, każda z rzędem kół.
-## Koła to walce obrócone osią wzdłuż Z, więc toczą się w kierunku marszu (+X).
-func _add_tracks(node: Node3D, length: float, half_width: float, wheels: int, color: Color, track: Texture2D) -> void:
-	var belt_color: Color = color.darkened(0.45)
-	var wheel_color: Color = color.darkened(0.6)
-	var uv_belt := Vector3(length / 4.0, 1.0, 1.0)
-	var step: float = length / float(wheels + 1)
+## Tworzy bryły z opisów. Materiał: barwa strony przyciemniona o `tone`
+## (tone < 0 to ciemny metal, niezależny od strony).
+func _instantiate_parts(node: Node3D, parts: Array, color: Color, textures: Dictionary) -> void:
+	for part in parts:
+		var tone: float = float(part["tone"])
+		var tex_key: String = str(part["tex"])
+		var texture: Texture2D = null
+		if tex_key != "" and textures.has(tex_key):
+			texture = textures[tex_key]
+		var part_color: Color = METAL_DARK if tone < 0.0 else color.darkened(tone)
+		var mesh_node := MeshInstance3D.new()
+		if str(part["prim"]) == "box":
+			var box := BoxMesh.new()
+			box.size = part["size"]
+			mesh_node.mesh = box
+		else:
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = float(part["top"])
+			cyl.bottom_radius = float(part["bottom"])
+			cyl.height = float(part["height"])
+			cyl.radial_segments = int(part["seg"])
+			mesh_node.mesh = cyl
+		var uv_scale: Vector3 = part["uv"]
+		mesh_node.material_override = _material_side(texture, part_color, uv_scale)
+		mesh_node.position = part["pos"]
+		mesh_node.rotation = part["rot"]
+		if not bool(part.get("shadow", true)):
+			mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.add_child(mesh_node)
+
+
+# --- gąsienice ----------------------------------------------------------------
+
+
+## Punkty bieżni gąsienicy (dolny bieg, tylny łuk, górny bieg, przedni łuk).
+func _track_path(front_x: float, rear_x: float, y_bottom: float, y_top: float) -> Array:
+	var r_end: float = (y_top - y_bottom) * 0.5
+	var y_center: float = (y_bottom + y_top) * 0.5
+	var ds: float = 0.01
+	var run: int = maxi(2, int(round((front_x - rear_x) / ds)))
+	var arc: int = maxi(4, int(round(PI * r_end / ds)))
+	var points: Array = []
+	for s in range(run + 1):
+		points.append(Vector2(front_x - ds * float(s), y_bottom))
+	for s in range(arc + 1):
+		var a: float = PI * 1.5 - PI * float(s) / float(arc)
+		points.append(Vector2(rear_x + cos(a) * r_end, y_center + sin(a) * r_end))
+	for s in range(run + 1):
+		points.append(Vector2(rear_x + ds * float(s), y_top))
+	for s in range(arc + 1):
+		var a: float = PI * 0.5 - PI * float(s) / float(arc)
+		points.append(Vector2(front_x + cos(a) * r_end, y_center + sin(a) * r_end))
+	return points
+
+
+## Gąsienica jako rząd ogniw rozłożonych równomiernie wzdłuż bieżni.
+## `count` określa dokładną liczbę ogniw, więc brył w sylwetce nie da się
+## przeoczyć.
+func _add_track_links(parts: Array, count: int, z: float, width: float,
+		front_x: float, rear_x: float, y_bottom: float, y_top: float) -> void:
+	var points: Array = _track_path(front_x, rear_x, y_bottom, y_top)
+	var total: int = points.size()
+	if count < 4 or total < 4:
+		return
+	var perimeter: float = 0.0
+	for s in range(1, total):
+		perimeter += (points[s] - points[s - 1]).length()
+	var pitch: float = perimeter / float(count)
+	for i in range(count):
+		var index: int = int(round(float(i) * float(total - 1) / float(count)))
+		var point: Vector2 = points[index]
+		var prev: Vector2 = points[maxi(0, index - 3)]
+		var next: Vector2 = points[mini(total - 1, index + 3)]
+		var tangent: Vector2 = next - prev
+		if tangent.length() < 0.0001:
+			tangent = Vector2.RIGHT
+		tangent = tangent.normalized()
+		parts.append(_part_box(Vector3(maxf(0.12, pitch * 0.92), 0.07, width),
+			Vector3(point.x, point.y, z), Vector3(0.0, 0.0, atan2(tangent.y, tangent.x)),
+			TONE_TRACK, "track", TRACK_UV, false))
+
+
+## Koło jezdne: opona, felga i piasta.
+func _add_road_wheel(parts: Array, x: float, y: float, z: float, radius: float, width: float) -> void:
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	parts.append(_part_cyl(radius, radius, width, 16, Vector3(x, y, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.52, radius * 0.52, width * 1.12, 16, Vector3(x, y, z), rot, TONE_DEEP, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.17, radius * 0.17, width * 1.3, 10, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+
+
+## Podwozie jednej strony: koła jezdne, koło napędowe, napinające, podtrzymujące.
+## Zwraca liczbę brył stałych (bez ogniw), żeby dało się policzyć budżet ogniw.
+func _add_running_gear(parts: Array, z: float, wheels: int, wheel_radius: float, width: float,
+		front_x: float, rear_x: float, y_bottom: float, y_top: float) -> int:
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	var y_center: float = (y_bottom + y_top) * 0.5
+	var span: float = (front_x - rear_x) * 0.72
+	for w in range(wheels):
+		var t: float = 0.0 if wheels <= 1 else float(w) / float(wheels - 1)
+		_add_road_wheel(parts, -span * 0.5 + span * t, y_bottom + wheel_radius, z, wheel_radius, width * 0.45)
+	# koło napędowe (tył) i napinające (przód): tarcza + piasta
+	parts.append(_part_cyl(0.36, 0.36, width * 0.42, 16, Vector3(rear_x, y_center, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(0.15, 0.15, width * 0.5, 10, Vector3(rear_x, y_center, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_cyl(0.32, 0.32, width * 0.4, 16, Vector3(front_x, y_center, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(0.13, 0.13, width * 0.48, 10, Vector3(front_x, y_center, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	# koła podtrzymujące pod górnym biegiem
+	for r in range(3):
+		parts.append(_part_cyl(0.11, 0.11, width * 0.35, 8,
+			Vector3(-1.6 + 1.6 * float(r), y_top - 0.08, z), rot, TONE_DEEP, "track", PLAIN_UV, false))
+	return wheels * 3 + 4 + 3
+
+
+# --- czołg --------------------------------------------------------------------
+
+
+## Sylwetka czołgu: `us` (M48A5 / M60A1) albo `su` (T-55 / T-62 / T-72).
+func _tank_parts(variant: String) -> Array:
+	var parts: Array = []
+	_add_tank_hull(parts, variant)
+	_add_tank_turret(parts, variant)
+	_add_tank_details(parts, variant)
+	# Gąsienice dostają resztę budżetu brył, więc liczba wychodzi co do jednej.
+	var width: float = 0.62
+	var front_x: float = 2.5
+	var rear_x: float = -2.5
+	var y_bottom: float = 0.10
+	var y_top: float = 0.82
+	var fixed: int = (5 * 3 + 4 + 3) * 2
+	var links_total: int = maxi(16, ARMOR_PARTS - parts.size() - fixed)
+	var per_belt: int = links_total >> 1  # połowa ogniw na każdą gąsienicę
 	for side in [-1.0, 1.0]:
-		var z: float = side * half_width
-		var belt := BoxMesh.new()
-		belt.size = Vector3(length, 1.1, 0.35)
-		var belt_node := MeshInstance3D.new()
-		belt_node.mesh = belt
-		belt_node.material_override = _material_side(track, belt_color, uv_belt)
-		belt_node.position = Vector3(0, 0.45, z)
-		node.add_child(belt_node)
-		for i in range(1, wheels + 1):
-			var wheel := CylinderMesh.new()
-			wheel.top_radius = 0.42
-			wheel.bottom_radius = 0.42
-			wheel.height = 0.7
-			var wheel_node := MeshInstance3D.new()
-			wheel_node.mesh = wheel
-			wheel_node.material_override = _material_side(track, wheel_color, Vector3(1.0, 1.0, 1.0))
-			wheel_node.position = Vector3(-length * 0.5 + step * float(i), 0.45, z)
-			wheel_node.rotation.x = PI * 0.5
-			node.add_child(wheel_node)
+		_add_running_gear(parts, side * 1.3, 5, 0.34, width, front_x, rear_x, y_bottom, y_top)
+		_add_track_links(parts, per_belt, side * 1.3, width, front_x, rear_x, y_bottom, y_top)
+	return _fit_parts(parts, ARMOR_PARTS)
 
 
-## Lufa: zwężający się walec wysunięty do przodu z wieży (oś wzdłuż +X).
-func _add_barrel(node: Node3D, base: Vector3, length: float, radius: float) -> void:
-	var barrel := CylinderMesh.new()
-	barrel.top_radius = radius
-	barrel.bottom_radius = radius * 1.15
-	barrel.height = length
-	var barrel_node := MeshInstance3D.new()
-	barrel_node.mesh = barrel
-	barrel_node.material_override = _material(METAL_DARK)
-	barrel_node.position = Vector3(base.x + length * 0.5, base.y, base.z)
-	barrel_node.rotation.z = -PI * 0.5
-	node.add_child(barrel_node)
+## Kadłub: wanna, górna część, pokład, pochyły pancerz czołowy, tył, błotniki.
+func _add_tank_hull(parts: Array, variant: String) -> void:
+	parts.append(_part_box(Vector3(6.2, 0.7, 2.4), Vector3(0.0, 0.85, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.2, 0.5, 2.44), Vector3(0.0, 1.4, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.0, 0.16, 2.5), Vector3(0.0, 1.7, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	# pochyły pancerz czołowy i dolna płyta nosa
+	parts.append(_part_box(Vector3(2.6, 0.14, 2.46), Vector3(2.35, 1.45, 0.0), Vector3(0.0, 0.0, -0.72), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.3, 0.5, 2.42), Vector3(3.05, 1.1, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	if variant == "su":
+		# T-55: niżej osadzony kadłub i bardziej ścięty przód
+		parts.append(_part_box(Vector3(1.2, 0.5, 2.3), Vector3(3.35, 0.95, 0.0), Vector3(0.0, 0.0, -0.35), TONE_BODY, "armor", HULL_UV))
+	else:
+		parts.append(_part_box(Vector3(1.0, 0.62, 2.5), Vector3(3.2, 1.05, 0.0), Vector3(0.0, 0.0, -0.25), TONE_BODY, "armor", HULL_UV))
+	# płyta tylna i osłona przekładni
+	parts.append(_part_box(Vector3(1.6, 0.9, 2.42), Vector3(-2.9, 1.3, 0.0), Vector3(0.0, 0.0, 0.5), TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.5, 1.4, 2.3), Vector3(-3.3, 1.3, 0.0), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+	# błotniki, fartuchy i uchwyty nad gąsienicami
+	for side in [-1.0, 1.0]:
+		parts.append(_part_box(Vector3(5.9, 0.12, 0.78), Vector3(-0.1, 1.32, side * 1.28), Vector3.ZERO, TONE_DARK, "armor", Vector3(2.0, 1.0, 1.0)))
+		parts.append(_part_box(Vector3(0.9, 0.1, 0.7), Vector3(2.95, 1.3, side * 1.28), Vector3(0.0, 0.0, side * -0.2), TONE_DARK, "armor"))
+		parts.append(_part_box(Vector3(0.55, 0.42, 0.66), Vector3(3.4, 0.98, side * 1.28), Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_box(Vector3(0.5, 0.45, 0.62), Vector3(-3.05, 0.98, side * 1.28), Vector3.ZERO, TONE_DEEP, "armor"))
 
 
-## Walec w układzie jednostki (wieża, właz) — bez obrotu.
-func _add_local_cylinder(node: Node3D, top: float, bottom: float, height: float, pos: Vector3,
-		color: Color, texture: Texture2D, uv_scale: Vector3) -> void:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = top
-	mesh.bottom_radius = bottom
-	mesh.height = height
-	var mesh_node := MeshInstance3D.new()
-	mesh_node.mesh = mesh
-	mesh_node.material_override = _material_side(texture, color, uv_scale)
-	mesh_node.position = pos
-	node.add_child(mesh_node)
+## Wieża: kopułowa warstwowa (ZSRR) albo kanciasta z pochyłym przodem (USA).
+func _add_tank_turret(parts: Array, variant: String) -> void:
+	parts.append(_part_cyl(1.4, 1.4, 0.14, 24, Vector3(0.0, 1.8, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	if variant == "su":
+		parts.append(_part_cyl(1.36, 1.18, 0.34, 24, Vector3(0.0, 2.02, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+		parts.append(_part_cyl(1.18, 0.98, 0.3, 24, Vector3(0.0, 2.34, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+		parts.append(_part_cyl(0.98, 0.8, 0.28, 24, Vector3(0.0, 2.6, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+		# odlewane jarzmo działa
+		parts.append(_part_cyl(0.46, 0.52, 0.62, 16, Vector3(1.3, 2.25, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
+	else:
+		parts.append(_part_box(Vector3(2.5, 0.72, 2.7), Vector3(-0.1, 2.16, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(1.7, 0.56, 2.62), Vector3(1.15, 2.3, 0.0), Vector3(0.0, 0.0, -0.6), TONE_BODY, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(2.3, 0.12, 2.52), Vector3(-0.2, 2.56, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(0.5, 0.56, 0.92), Vector3(1.85, 2.28, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	# lufa z przedmuchiwaczem i wylotem
+	var gun_y: float = 2.28 if variant == "us" else 2.25
+	var barrel_len: float = 3.4 if variant == "us" else 4.0
+	var barrel_start: float = 1.9 if variant == "us" else 1.55
+	parts.append(_part_cyl(0.1, 0.115, barrel_len, 16, Vector3(barrel_start + barrel_len * 0.5, gun_y, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(2.0, 1.0, 1.0)))
+	parts.append(_part_cyl(0.16, 0.16, 0.5, 16, Vector3(barrel_start + barrel_len * 0.35, gun_y, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.13, 0.13, 0.3, 16, Vector3(barrel_start + barrel_len + 0.1, gun_y, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	# włazy, km przeciwlotniczy, wyrzutnie granatów dymnych
+	parts.append(_part_cyl(0.3, 0.3, 0.12, 12, Vector3(-0.35, 2.78, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.26, 0.26, 0.1, 12, Vector3(0.45, 2.72, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.3, 0.26, 0.28), Vector3(-0.35, 2.9, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.72, 0.16, 0.16), Vector3(-0.3, 3.02, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_cyl(0.04, 0.04, 0.9, 8, Vector3(0.35, 3.02, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.3, 0.22, 0.14), Vector3(-0.62, 2.96, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	for smoke in range(6):
+		var side: float = 1.0 if smoke % 2 == 0 else -1.0
+		var row: int = smoke >> 1  # co dwa pociski tworzą rząd wyrzutni
+		parts.append(_part_cyl(0.06, 0.06, 0.22, 6,
+			Vector3(0.85 - float(row) * 0.22, 2.5 if variant == "su" else 2.15, side * 1.05),
+			Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
+
+
+## Szczegóły: reflektory, anteny, wydech, narzędzia, paliwo i zapasowe ogniwa.
+func _add_tank_details(parts: Array, variant: String) -> void:
+	# reflektory z osłonami i sygnał dźwiękowy
+	for side in [-1.0, 1.0]:
+		parts.append(_part_cyl(0.13, 0.13, 0.16, 12, Vector3(3.0, 1.62, side * 0.86), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.18, 0.22, 0.3), Vector3(3.05, 1.72, side * 0.86), Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_cyl(0.05, 0.05, 0.18, 8, Vector3(3.0, 1.5, side * 1.05), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.2, 0.2, 0.2), Vector3(3.2, 1.5, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	# haki holownicze z przodu i z tyłu
+	for side in [-1.0, 1.0]:
+		parts.append(_part_box(Vector3(0.22, 0.14, 0.12), Vector3(3.4, 0.85, side * 1.0), Vector3.ZERO, TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.22, 0.14, 0.12), Vector3(-3.55, 1.2, side * 1.0), Vector3.ZERO, TONE_METAL, ""))
+	# lina holownicza wzdłuż burty i narzędzia pionierskie
+	parts.append(_part_cyl(0.035, 0.035, 3.4, 6, Vector3(0.4, 1.34, 1.2), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(1.1, 0.08, 0.16), Vector3(-1.2, 1.36, 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.9, 0.09, 0.12), Vector3(0.2, 1.36, -1.16), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.6, 0.12, 0.16), Vector3(-2.0, 1.36, 1.16), Vector3.ZERO, TONE_DEEP, "armor"))
+	# wydech (ZSRR: dwie rury z osłoną, USA: tłumik)
+	if variant == "su":
+		for side in [-1.0, 1.0]:
+			parts.append(_part_cyl(0.12, 0.12, 0.5, 10, Vector3(-2.6, 1.35, side * 1.15), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+			parts.append(_part_box(Vector3(0.7, 0.2, 0.24), Vector3(-2.6, 1.48, side * 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
+	else:
+		parts.append(_part_box(Vector3(1.0, 0.26, 0.3), Vector3(-2.9, 1.55, -1.15), Vector3.ZERO, TONE_METAL, ""))
+		parts.append(_part_cyl(0.09, 0.09, 0.4, 10, Vector3(-3.4, 1.55, -1.15), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	# zbiorniki paliwa z tyłu (ZSRR) albo skrzynie i plandeka (USA)
+	if variant == "su":
+		for side in [-1.0, 1.0]:
+			parts.append(_part_cyl(0.3, 0.3, 1.0, 16, Vector3(-3.75, 1.75, side * 0.6), Vector3(0.0, 0.0, -PI * 0.5), TONE_WHEEL, "armor", Vector3(1.5, 1.0, 1.0)))
+			parts.append(_part_box(Vector3(0.1, 0.14, 0.7), Vector3(-3.75, 2.05, side * 0.6), Vector3.ZERO, TONE_METAL, ""))
+	else:
+		for side in [-1.0, 1.0]:
+			parts.append(_part_box(Vector3(0.8, 0.5, 0.7), Vector3(-3.7, 1.9, side * 0.62), Vector3.ZERO, TONE_DEEP, "armor"))
+			parts.append(_part_box(Vector3(0.66, 0.1, 0.56), Vector3(-3.7, 2.2, side * 0.62), Vector3.ZERO, TONE_METAL, ""))
+		parts.append(_part_cyl(0.2, 0.2, 2.2, 12, Vector3(-3.6, 1.75, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	# anteny na wieży
+	for side in [-1.0, 1.0]:
+		parts.append(_part_cyl(0.02, 0.02, 1.6, 4, Vector3(-1.0, 3.4, side * 0.9), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+	# zapasowe ogniwa na pancerzu czołowym
+	for spare in range(6):
+		parts.append(_part_box(Vector3(0.2, 0.07, 0.56),
+			Vector3(2.45 - 0.24 * float(spare), 1.62 + 0.05 * float(spare % 3), -0.95),
+			Vector3(0.0, 0.0, -0.72), TONE_TRACK, "track", TRACK_UV))
+
+
+# --- wóz bojowy ---------------------------------------------------------------
+
+
+## Sylwetka wozu bojowego: `us` (M113) albo `su` (BMP-1 / BTR-60 / MT-LB).
+func _mech_parts(variant: String) -> Array:
+	var parts: Array = []
+	parts.append(_part_box(Vector3(5.2, 0.56, 2.0), Vector3(0.0, 0.75, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(5.2, 0.5, 2.1), Vector3(0.0, 1.22, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(5.0, 0.14, 2.16), Vector3(0.0, 1.5, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(2.4, 0.12, 2.06), Vector3(1.8, 1.3, 0.0), Vector3(0.0, 0.0, -0.66), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.1, 0.44, 2.02), Vector3(2.5, 1.0, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.2, 0.8, 2.02), Vector3(-2.3, 1.15, 0.0), Vector3(0.0, 0.0, 0.45), TONE_DARK, "armor", HULL_UV))
+	for side in [-1.0, 1.0]:
+		parts.append(_part_box(Vector3(5.0, 0.12, 0.62), Vector3(-0.1, 1.22, side * 1.12), Vector3.ZERO, TONE_DARK, "armor", Vector3(2.0, 1.0, 1.0)))
+		parts.append(_part_box(Vector3(0.7, 0.09, 0.56), Vector3(2.6, 1.2, side * 1.12), Vector3(0.0, 0.0, side * -0.18), TONE_DARK, "armor"))
+	# wieżyczka (BMP: z działkiem 73 mm, M113: z km-em)
+	parts.append(_part_cyl(0.72, 0.78, 0.46, 16, Vector3(0.35, 1.7, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(0.6, 0.6, 0.1, 16, Vector3(0.35, 1.96, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.26, 0.28, 0.3, 12, Vector3(0.15, 2.1, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	if variant == "su":
+		parts.append(_part_cyl(0.07, 0.08, 2.0, 12, Vector3(1.7, 1.72, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+		parts.append(_part_cyl(0.1, 0.1, 0.26, 12, Vector3(2.75, 1.72, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(1.4, 0.3, 0.34), Vector3(1.6, 2.0, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	else:
+		parts.append(_part_box(Vector3(0.7, 0.18, 0.18), Vector3(0.55, 2.0, 0.0), Vector3.ZERO, TONE_METAL, ""))
+		parts.append(_part_cyl(0.04, 0.04, 0.8, 8, Vector3(1.3, 2.0, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	# reflektory, anteny, narzędzia, lina
+	for side in [-1.0, 1.0]:
+		parts.append(_part_cyl(0.11, 0.11, 0.14, 12, Vector3(2.45, 1.42, side * 0.78), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.16, 0.2, 0.26), Vector3(2.5, 1.52, side * 0.78), Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_box(Vector3(0.2, 0.12, 0.1), Vector3(2.7, 0.7, side * 0.9), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_cyl(0.02, 0.02, 1.5, 4, Vector3(-1.1, 2.5, 0.8), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_cyl(0.03, 0.03, 2.6, 6, Vector3(-0.4, 1.28, 1.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.9, 0.08, 0.14), Vector3(-1.3, 1.3, 0.95), Vector3.ZERO, TONE_DEEP, "armor"))
+	# ogniwa na pancerzu czołowym
+	for spare in range(4):
+		parts.append(_part_box(Vector3(0.18, 0.07, 0.5),
+			Vector3(1.75 - 0.22 * float(spare), 1.45 + 0.04 * float(spare % 2), -0.75),
+			Vector3(0.0, 0.0, -0.66), TONE_TRACK, "track", TRACK_UV))
+	var width: float = 0.52
+	var front_x: float = 2.0
+	var rear_x: float = -2.1
+	var y_bottom: float = 0.08
+	var y_top: float = 0.72
+	var fixed: int = (4 * 3 + 4 + 3) * 2
+	var links_total: int = maxi(12, MECH_PARTS - parts.size() - fixed)
+	var per_belt: int = links_total >> 1  # połowa ogniw na każdą gąsienicę
+	for side in [-1.0, 1.0]:
+		_add_running_gear(parts, side * 1.1, 4, 0.3, width, front_x, rear_x, y_bottom, y_top)
+		_add_track_links(parts, per_belt, side * 1.1, width, front_x, rear_x, y_bottom, y_top)
+	return _fit_parts(parts, MECH_PARTS)
+
+
+# --- wyrównanie liczby brył ---------------------------------------------------
+
+
+## Domyka liczbę brył do `target`: brakujące zamienia na zapasowe ogniwa
+## na pancerzu, nadmiar usuwa z końca listy (to zawsze ostatnie ogniwa).
+func _fit_parts(parts: Array, target: int) -> Array:
+	while parts.size() > target:
+		parts.remove_at(parts.size() - 1)
+	var index: int = 0
+	while parts.size() < target:
+		var ring: int = index >> 3  # co ósme ogniwo trafia do wyższego rzędu
+		parts.append(_part_box(Vector3(0.2, 0.07, 0.56),
+			Vector3(2.15 - 0.24 * float(index % 8), 1.68 + 0.18 * float(ring), -1.05),
+			Vector3(0.0, 0.0, -0.72), TONE_TRACK, "track", TRACK_UV))
+		index += 1
+	return parts
 
 
 # --- HUD ---------------------------------------------------------------------

@@ -6,13 +6,24 @@ w `--headless` nie renderuje obrazu).
 
 ---
 
-## Czołg z gry — 16 brył
+## Czołg z gry — 256 brył
 
 Geometria i tekstury pochodzą **z gry**: zrzut robi skrypt, który woła te same
-funkcje budujące świat bitwy co `battle_view.gd`. Cztery ujęcia, a pod nimi
-wóz bojowy i piechur w tej samej skali oraz ta sama geometria w barwach stron.
+funkcje budujące świat bitwy co `battle_view.gd`. Sylwetka jest wzorowana na
+prawdziwych wozach z 1975 roku — NATO: M48A5 / M60A1 (wieża skrzynkowa),
+ZSRR: T-55 / T-62 (kopuła odlewana). Kadłub ma pochyłe płyty pancerza,
+błotniki z fartuchami, 5 kół jezdnych na stronę, rolki powrotne, jarzmo lufy,
+włazy, anteny i wyposażenie zewnętrzne.
 
 ![Czołg z gry w czterech ujęciach](czolg_z_gry.jpg)
+
+## Sylwetka NATO i ZSRR — dwie różne wieże
+
+Jedna funkcja budująca, dwa warianty: kopuła z odlewu i wieża skrzynkowa.
+Czołg i wóz bojowy każdej strony wyglądają inaczej, choć mają dokładnie
+256 (czołg) i 128 (wóz) brył.
+
+![Warianty sylwetek: NATO i ZSRR](warianty_silwetek.jpg)
 
 ## Ta sama tekstura, trzy barwy stron
 
@@ -58,9 +69,11 @@ Tekstury otoczenia na bryłach, które buduje `battle_view.gd`:
 
 ![Makieta otoczenia](makieta_otoczenia.jpg)
 
-Schemat brył pojazdów w skali 1:20:
+Rzut z boku **prawdziwych brył** pojazdów — dane zrzucone z gry skryptem
+`tools/godot/dump_meshes.gd`, więc schemat nie może się rozjechać z kodem.
+Widać każde ogniwo gąsienicy, każde koło i każdą płytę pancerza osobno:
 
-![Makieta pojazdów](makieta_pojazdow.jpg)
+![Makieta pojazdów — rzut brył z boku](makieta_pojazdow.jpg)
 
 ---
 
@@ -70,7 +83,8 @@ Schemat brył pojazdów w skali 1:20:
 | --- | --- |
 | arkusze tekstur, ikon i otoczenia | **1:1** — to wprost pliki z `assets/` |
 | `mapa_kampanii_seed1` | **dane i kafle 1:1** — prawdziwy seed z `tests/ref_map.json`; wrogowie i zwiadowca to znaczniki przykładowe |
-| `czolg_z_gry`, `czolg_barwy_stron`, `jednostki_skala` | **geometria, barwy i tekstury 1:1** z gry; oświetlenie i rzut to przybliżenie renderera (Godot inaczej tonuje obraz) — szczegóły w `tools/godot/README.md` |
+| `czolg_z_gry`, `czolg_barwy_stron`, `jednostki_skala`, `warianty_silwetek` | **geometria, barwy i tekstury 1:1** z gry; oświetlenie i rzut to przybliżenie renderera (Godot inaczej tonuje obraz) — szczegóły w `tools/godot/README.md` |
+| `makieta_pojazdow` | **bryły i wymiary 1:1** (rzut ortograficzny z prawdziwej geometrii); wygląd powierzchni uproszczony do płaskich barw stron |
 
 ## Odtworzenie
 

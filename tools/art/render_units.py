@@ -421,6 +421,10 @@ def main():
     tank_tris = unit_triangles(tank)
     ground = ground_triangles()
 
+    def parts(cls: str, side: str) -> int:
+        """Liczba brył faktycznie zbudowanych przez battle_view.gd."""
+        return len(units[(cls, side)]["meshes"])
+
     cell = (430, 330)
     views = []
     shots = [
@@ -433,9 +437,9 @@ def main():
         cam = look_at(eye, target, up)
         image = render_unit_scene(tank_tris, cam, cell, fov, textures, ground)
         views.append((image, caption))
-    compose(views, "Czołg z gry — 16 brył, geometria i tekstury z battle_view.gd",
-            "kadłub 7,0 × 2,0 × 3,2 m · dwie gąsienice 7,4 m · 5 kół na stronę · wieża Ø2,4 m · właz · lufa 3,6 m · "
-            "cieniowanie i rzut: przybliżenie (brak okna graficznego)",
+    compose(views, f"Czołg z gry — {parts('armor', 'gracz')} brył, geometria i tekstury z battle_view.gd",
+            "sylwetka wzorowana na T-55/T-62 (kadłub 6,6 m, pochyły pancerz czołowy, kopuła wieży, 5 kół jezdnych, "
+            "błotniki, lufa z wylotem) · cieniowanie i rzut: przybliżenie (brak okna graficznego)",
             out_dir / "render_czolg.png", cell)
 
     # Trzy barwy stron + wóz bojowy i piechur dla skali.
@@ -449,13 +453,27 @@ def main():
             out_dir / "render_czolg_barwy.png", cell)
 
     views = []
-    for cls, caption in (("armor", "czołg — 16 brył"), ("mech", "wóz bojowy — 13 brył"), ("infantry", "piechur — 2 bryły")):
+    for cls, caption in (("armor", f"czołg — {parts('armor', 'gracz')} brył"),
+                         ("mech", f"wóz bojowy — {parts('mech', 'gracz')} brył"),
+                         ("infantry", f"piechur — {parts('infantry', 'gracz')} brył")):
         cam = look_at((9.0, 4.4, 7.6), (0.0, 1.1, 0.0))
         image = render_unit_scene(unit_triangles(units[(cls, "gracz")]), cam, cell, 40.0, textures, ground)
         views.append((image, caption))
     compose(views, "Jednostki gracza w tej samej skali — tak zbuduje je bitwa",
-            "te same funkcje (_build_armor / _build_mech / _build_infantry), ta sama ziemia i światło",
+            "te same funkcje (_tank_parts / _mech_parts / _build_infantry), ta sama ziemia i światło",
             out_dir / "render_jednostki.png", cell)
+
+    # Sylwetki stron: wóz z wieżą skrzynkową (US) obok wozu z kopułą (ZSRR).
+    views = []
+    pairs = (("armor", "gracz", "czołg NATO (M48/M60) — wieża skrzynkowa"), ("armor", "wróg", "czołg ZSRR (T-55/T-62) — kopuła"),
+             ("mech", "gracz", "wóz NATO — wieża skrzynkowa"), ("mech", "wróg", "wóz ZSRR — kopuła"))
+    for cls, side, caption in pairs:
+        cam = look_at((8.6, 4.2, 7.4), (0.0, 1.1, 0.0))
+        image = render_unit_scene(unit_triangles(units[(cls, side)]), cam, cell, 40.0, textures, ground)
+        views.append((image, caption))
+    compose(views, "Sylwetki stron — NATO (wieża skrzynkowa) i ZSRR (kopuła)",
+            "jedna funkcja budująca, dwa warianty: kadłub, wieża, jarzmo i wyposażenie zmieniają się zależnie od strony",
+            out_dir / "render_warianty.png", cell)
 
 
 if __name__ == "__main__":

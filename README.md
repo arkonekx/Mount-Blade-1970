@@ -117,10 +117,16 @@ otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 3 tekstury
 sprzętu (mundur, pancerz, ogniwa gąsienicy) i 6 ikon mapy (gracz, wróg, cel,
 miasto, łódź, zwiadowca).
 
-Sylwetki pojazdów nie są już prostopadłościanami: czołg (16 brył) ma dwa
-prostopadłościany gąsienic, po pięć kół, wieżę z włazem i lufę, a wóz bojowy
-(13 brył) — dwie gąsienice, cztery koła, wieżyczkę i lufę. Koła to walce
-obrócone osią w Z, więc toczą się w kierunku marszu.
+Sylwetki pojazdów są składane z setek brył i wzorowane na prawdziwych wozach
+z 1975 roku: czołg ma **256 brył** (kadłub z pochyłymi płytami pancerza,
+błotniki z fartuchami, dwie gąsienice z ogniwami, po pięć kół jezdnych i rolki
+powrotne na stronę, wieża z jarzmem i lufą z wylotem, włazy, anteny, reflektory,
+wyposażenie zewnętrzne), a wóz bojowy **128 brył** (te same elementy w mniejszej
+skali). Piechur to 10 brył: ciało, hełm, plecak, kończyny i broń. Sylwetka ma
+dwa warianty — NATO (wieża skrzynkowa, wzór M48A5/M60A1) i ZSRR (kopuła
+odlewana, wzór T-55/T-62) — wybierane automatycznie po stronie jednostki.
+Bryły dzielą wspólne materiały (`_material_cache`), więc mimo tysiąca brył
+w bitwie powstaje kilkadziesiąt materiałów, a nie tysiące.
 
 Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez kolor strony
 (`albedo_color`): detal daje tekstura, a zielony gracz / niebiescy sojusznicy /

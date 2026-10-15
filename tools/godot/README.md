@@ -13,10 +13,11 @@ python3 tools/art/render_units.py --meshes /tmp/art/units.json --out /tmp/art/ou
 ```
 
 1. `dump_meshes.gd` woła **te same funkcje, które budują świat bitwy**
-   (`_build_armor`, `_build_mech`, `_build_infantry` z `battle_view.gd`) i zapisuje
+   (`_tank_parts`, `_mech_parts`, `_build_infantry` z `battle_view.gd`) i zapisuje
    każdą bryłę: typ siatki, rozmiar, pozycję, obrót, `albedo_color`, `uv1_scale`
    i klucz tekstury. W pliku ląduje więc dokładnie ta geometria, którą widzi
-   gracz — 16 brył czołgu, 13 wozu bojowego, 2 piechura.
+   gracz — 256 brył czołgu, 128 wozu bojowego, 10 piechura, dla każdej strony
+   osobno (wariant NATO albo ZSRR).
 2. `render_units.py` rasteryzuje te bryły (numpy + Pillow): rzut perspektywiczny,
    bufor głębokości, oświetlenie per ściana, rzut cienia na grunt, tekstury
    próbkowane z odtworzonymi UV i `uv1_scale`.

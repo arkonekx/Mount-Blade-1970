@@ -5,7 +5,7 @@ extends SceneTree
 ##   godot --headless --path . -s res://tools/godot/dump_meshes.gd -- /tmp/art/units.json
 ##
 ## Skrypt korzysta z tych samych funkcji, które budują świat bitwy
-## (`_build_infantry`, `_build_mech`, `_build_armor` w battle_view.gd), więc
+## (`_build_infantry`, `_mech_parts`, `_tank_parts` w battle_view.gd), więc
 ## w pliku ląduje dokładnie ta geometria, którą widzi gracz — bryła po bryle,
 ## z rozmiarami, pozycjami, obrotami, kolorami i teksturami.
 
@@ -50,13 +50,14 @@ func _initialize() -> void:
 		for cls in ["infantry", "mech", "armor"]:
 			var holder: Node3D = Node3D.new()
 			root.add_child(holder)
+			var variant: String = "su" if str(side["name"]) == "wróg" else "us"
 			match cls:
 				"infantry":
 					view._build_infantry(holder, side["color"], uniform)
 				"mech":
-					view._build_mech(holder, side["color"], armor, track)
+					view._instantiate_parts(holder, view._mech_parts(variant), side["color"], known_textures)
 				_:
-					view._build_armor(holder, side["color"], armor, track)
+					view._instantiate_parts(holder, view._tank_parts(variant), side["color"], known_textures)
 			units.append({
 				"cls": cls,
 				"side": str(side["name"]),

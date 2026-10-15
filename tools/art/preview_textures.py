@@ -10,7 +10,9 @@ Tworzy:
                              z kafli gry, z miastami, polem startowym i legendą,
     arkusz_otoczenia.png   — 5 tekstur otoczenia bitwy,
     makieta_otoczenia.png  — makieta brył (drzewo, skała, blok) z tymi teksturami,
-                             żeby było widać, jak siadają na obiektach 3D.
+                             żeby było widać, jak siadają na obiektach 3D,
+    makieta_pojazdow.png   — rzut z boku prawdziwych brył pojazdów z gry
+                             (dane z tools/godot/dump_meshes.gd).
 
 Dzięki temu widać efekt bez uruchamiania Godota (środowisko bez okna graficznego).
 Wymaga Pillow.
@@ -340,102 +342,148 @@ def _draw_textured(canvas, shape, texture, points, color=(1.0, 1.0, 1.0), outlin
         draw.line([tuple(pt) for pt in loop], fill=outline, width=width)
 
 
-def vehicles_mock(out_dir):
-    """Schemat brył pojazdów w skali — te same wymiary co battle_view.gd.
+def _load_units_json(meshes_path):
+    """Geometria jednostek zrzucona z gry (tools/godot/dump_meshes.gd)."""
+    path = pathlib.Path(meshes_path)
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    return {(str(u["cls"]), str(u["side"])): u for u in data["units"]}
 
-    Widok z boku: rysujemy najpierw kadłub i wieżę, a na końcu gąsienicę z kołami,
-    bo bliższa gąsienica (z = ±1.6 m) zasłania bok kadłuba — tak samo widzi to
-    kamera w grze.
+
+def _unit_extents(unit):
+    """Wymiary brył jednostki: długość, wysokość całkowita i wysokość kadłuba.
+
+    „Wysokość do wieży” to wysokość bez cienkich elementów (anteny, pręty):
+    bryła liczy się tylko wtedy, gdy jej najmniejszy wymiar ma co najmniej
+    0,4 m — czyli gdy to naprawdę korpus, wieża albo koło, a nie maszt anteny.
     """
-    armor_tex = load_unit("armor")
-    track_tex = load_unit("track")
-    if armor_tex is None or track_tex is None:
-        print("makieta pojazdów: brak tekstur (pomiń)")
+    def size_of(mesh):
+        prim = mesh["prim"]
+        if prim == "box":
+            return mesh["size"]
+        if prim in ("cylinder", "capsule"):
+            return [mesh["bottom_radius"] * 2, mesh["height"], mesh["bottom_radius"] * 2]
+        if prim == "sphere":
+            return [mesh["radius"] * 2] * 3
+        return [0.0, 0.0, 0.0]
+
+    x_min, x_max = 0.0, 0.0
+    height = 0.0
+    hull = 0.0
+    for mesh in unit["meshes"]:
+        size = size_of(mesh)
+        pos = mesh["position"]
+        x_min = min(x_min, pos[0] - size[0] * 0.5)
+        x_max = max(x_max, pos[0] + size[0] * 0.5)
+        top = pos[1] + size[1] * 0.5
+        height = max(height, top)
+        if min(size) >= 0.4:
+            hull = max(hull, top)
+    return x_max - x_min, height, hull
+
+
+def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
+    """Rzut techniczny brył pojazdów — prosto z geometrii, którą buduje gra.
+
+    Rysujemy prawdziwe bryły z `dump_meshes.gd` (rzut ortograficzny z boku),
+    więc schemat nie może się rozjechać z kodem: każda nowa bryła w
+    `battle_view.gd` pojawia się tu sama.
+    """
+    units = _load_units_json(meshes_path)
+    if units is None:
+        print(f"makieta pojazdów: brak {meshes_path} (uruchom najpierw dump_meshes.gd — pominięto)")
         return
 
-    ppm = 44.0                      # pikseli na metr
-    center_x = 250                  # środek pojazdu w pikselach
-    tank_base = 330                 # linia jezdni czołgu
-    mech_base = 560
-    w, h = 1200, 640
-    SIDE = (0.25, 0.45, 0.90)       # barwa strony (jak sojusznik w grze)
-    TURRET = tuple(c * 0.8 for c in SIDE)
-    HATCH = tuple(c * 0.65 for c in SIDE)
-    BELT = (0.58, 0.58, 0.61)
-    WHEEL = (0.34, 0.34, 0.37)
-    GUN = (0.42, 0.42, 0.45)
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import render_units as RU
 
-    canvas = Image.new("RGB", (w, h), BG)
+    ppm = 46.0                      # pikseli na metr
+    w, h = 1480, 750
+    BG2 = (18, 20, 24)
+    FG2 = (232, 236, 240)
+    DIM2 = (150, 158, 168)
+    GROUND = (52, 56, 64)
+
+    canvas = Image.new("RGB", (w, h), BG2)
     draw = ImageDraw.Draw(canvas)
-    draw.text((22, 20), "Makieta pojazdów — bryły z battle_view.gd, skala 1:20",
-              font=ImageFont.truetype(FONT_BOLD, 32), fill=FG)
-    draw.text((24, 60), "te same wymiary i tekstury, które buduje kod · barwa strony "
-                        "mnożona przez teksturę · widok z boku (bliższa gąsienica na wierzchu)",
-              font=ImageFont.truetype(FONT, 17), fill=DIM)
+    draw.text((22, 18), "Makieta pojazdów — bryły z battle_view.gd, rzut z boku",
+              font=ImageFont.truetype(FONT_BOLD, 30), fill=FG2)
+    draw.text((24, 56), "prawdziwa geometria z gry (tools/godot/dump_meshes.gd) · wspólna skala · "
+                        "obrys = pojedyncza bryła",
+              font=ImageFont.truetype(FONT, 17), fill=DIM2)
 
-    def px(m):
-        return center_x + m * ppm
+    def draw_unit(unit, center_x, base_y):
+        """Rysuje jednostkę wyśrodkowaną w kolumnie; zwraca liczniki brył."""
+        tris = RU.unit_triangles(unit)
+        xs = [float(v[0]) for t in tris for v in t[0]]
+        zs = [float(v[2]) for t in tris for v in t[0]]
+        cx = (max(xs) + min(xs)) * 0.5
+        z_mid = (max(zs) + min(zs)) * 0.5
+        z_half = max(1e-4, (max(zs) - min(zs)) * 0.5)
 
-    def py(m, base):
-        return base - m * ppm
+        def px(x):
+            return center_x + (x - cx) * ppm
 
-    def body(length, height, y_center, base, color):
-        _draw_textured(canvas, "rect", armor_tex,
-                       [(px(-length * 0.5), py(y_center + height * 0.5, base)),
-                        (px(length * 0.5), py(y_center - height * 0.5, base))], color=color)
+        def py(y):
+            return base_y - y * ppm
 
-    def turret(center, width, height, y_bottom, base, barrel_from, barrel_to, barrel_y, top_color):
-        _draw_textured(canvas, "poly", armor_tex,
-                       [(px(center - width * 0.5), py(y_bottom + height, base)),
-                        (px(center + width * 0.5), py(y_bottom + height, base)),
-                        (px(center + width * 0.45), py(y_bottom, base)),
-                        (px(center - width * 0.5), py(y_bottom, base))], color=top_color)
-        _draw_textured(canvas, "rect", armor_tex,
-                       [(px(barrel_to), py(barrel_y + 0.07, base)),
-                        (px(barrel_from), py(barrel_y - 0.07, base))], color=GUN)
+        # od najdalszych brył do najbliższych, żeby bliższy bok zasłaniał dalszy
+        for verts, _uvs, _tex, albedo in sorted(tris, key=lambda t: sum(v[2] for v in t[0])):
+            depth = sum(v[2] for v in verts) / 3.0
+            shade = 0.74 + 0.26 * (depth - (z_mid - z_half)) / (2 * z_half)
+            color = tuple(int(max(0, min(255, c * 255 * shade))) for c in albedo[:3])
+            edge = tuple(int(c * 0.42) for c in color)
+            draw.polygon([(px(float(v[0])), py(float(v[1]))) for v in verts], fill=color, outline=edge)
+        belts = sum(1 for m in unit["meshes"] if m.get("texture") == "track")
+        return belts
 
-    def running_gear(length, base, wheels, belt_top, belt_bottom):
-        _draw_textured(canvas, "rect", track_tex,
-                       [(px(-length * 0.5), py(belt_top, base)),
-                        (px(length * 0.5), py(belt_bottom, base))], color=BELT)
-        step = length / float(wheels + 1)
-        for i in range(1, wheels + 1):
-            cx = -length * 0.5 + step * float(i)
-            _draw_textured(canvas, "ellipse", track_tex,
-                           [(px(cx - 0.40), py(belt_top - 0.12, base)),
-                            (px(cx + 0.40), py(belt_bottom + 0.12, base))], color=WHEEL)
+    def fill(text, x, y, font, color, anchor="ma"):
+        draw.text((x, y), text, font=ImageFont.truetype(font, 15 if font == FONT else 19),
+                  fill=color, anchor=anchor)
 
-    # --- czołg: kadłub 7.0×2.0 na y=1.1, gąsienica 7.4×1.1 na y=0.45, wieża 2.4 x 0.7 ---
-    body(7.0, 2.0, 1.1, tank_base, SIDE)
-    turret(0.2, 2.4, 0.7, 2.05, tank_base, 2.2, 5.8, 2.45, TURRET)
-    _draw_textured(canvas, "ellipse", armor_tex,
-                   [(px(-0.35), py(2.92, tank_base)), (px(0.35), py(2.72, tank_base))], color=HATCH)
-    running_gear(7.4, tank_base, 5, 1.0, -0.1)
+    def ruler(x0, y):
+        """Podziałka: kreska co 1 m."""
+        for step in range(4):
+            x = x0 + step * ppm
+            draw.line([(x, y - 4), (x, y + 4)], fill=GROUND, width=2)
+        draw.line([(x0, y), (x0 + 3 * ppm, y)], fill=GROUND, width=2)
+        draw.text((x0, y + 8), "0", font=ImageFont.truetype(FONT, 14), fill=DIM2)
+        draw.text((x0 + 3 * ppm, y + 8), "3 m", font=ImageFont.truetype(FONT, 14), fill=DIM2, anchor="ma")
 
-    # --- wóz bojowy: kadłub 6.0×1.9 na y=1.0, gąsienica 6.3×1.1, wieżyczka 1.7 x 0.5 ---
-    body(6.0, 1.9, 1.0, mech_base, SIDE)
-    turret(0.2, 1.7, 0.5, 1.9, mech_base, 1.5, 3.7, 2.2, TURRET)
-    running_gear(6.3, mech_base, 4, 1.0, -0.1)
+    rows = [
+        (380, [(330, "armor", "gracz", "czołg NATO — M48A5 / M60A1"),
+               (1000, "armor", "wróg", "czołg ZSRR — T-55 / T-62")]),
+        (665, [(330, "mech", "gracz", "wóz bojowy NATO — M113"),
+               (1000, "mech", "wróg", "wóz bojowy ZSRR — BMP-1 / BTR-60")]),
+    ]
+    for base_y, entries in rows:
+        draw.line([(20, base_y), (w - 20, base_y)], fill=GROUND, width=2)
+        for center_x, cls, side, caption in entries:
+            unit = units.get((cls, side))
+            if unit is None:
+                continue
+            belts = draw_unit(unit, center_x, base_y)
+            length, height, hull = _unit_extents(unit)
+            draw.text((center_x, base_y + 16), f"{caption} · {len(unit['meshes'])} brył",
+                      font=ImageFont.truetype(FONT_BOLD, 19), fill=FG2, anchor="ma")
+            draw.text((center_x, base_y + 44),
+                      f"dł. {length:.1f} m · wys. do wieży {hull:.1f} m · z antenami {height:.1f} m · "
+                      f"{belts} ogniw i kół",
+                      font=ImageFont.truetype(FONT, 15), fill=DIM2, anchor="ma")
+        ruler(60, base_y - 150)
 
-    # --- podpisy pod pojazdami ---
-    draw.text((px(-3.7), tank_base + 18), "czołg · 16 brył (M48A5, M60A1, T-55, T-72)",
-              font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
-    draw.text((px(-3.15), mech_base + 18), "wóz bojowy / transporter · 13 brył (M113, BMP-1, BTR-60)",
-              font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
-
-    # --- legenda części ---
-    note_x, y = 620, 120
-    for title, desc in [
-        ("kadłub", "prostopadłościan z blachą pancerza (barwa strony)"),
-        ("wieża + właz", "walce osadzone w układzie jednostki"),
-        ("lufa", "walec osią w +X, zwężony ku wylotowi"),
-        ("gąsienica", "prostopadłościan z teksturą ogniw"),
-        ("koła", "walce osią w Z — toczą się w kierunku +X"),
-        ("piechur (dla skali)", "kapsuła w mundurze + karabin: 2 bryły"),
-    ]:
-        draw.text((note_x, y), title, font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
-        draw.text((note_x, y + 24), desc, font=ImageFont.truetype(FONT, 16), fill=DIM)
-        y += 64
+    infantry = units.get(("infantry", "gracz"))
+    if infantry is not None:
+        base_y = 665
+        draw_unit(infantry, 1390, base_y)
+        for line, font, dy in ((f"piechur · {len(infantry['meshes'])} brył", FONT_BOLD, 16),
+                               ("dla skali: kapsuła, hełm,", FONT, 44),
+                               ("plecak, kończyny, karabin", FONT, 62)):
+            draw.text((1462, base_y + dy), line,
+                      font=ImageFont.truetype(font, 15 if font == FONT else 19),
+                      fill=FG2 if font == FONT_BOLD else DIM2, anchor="ra")
 
     path = out_dir / "makieta_pojazdow.png"
     canvas.save(path, "PNG")
@@ -567,6 +615,8 @@ def main():
     parser = argparse.ArgumentParser(description="Podglądy tekstur terenu (arkusz + mapa).")
     parser.add_argument("--out", default="/tmp/art/out")
     parser.add_argument("--seed", default="1")
+    parser.add_argument("--meshes", default="/tmp/art/units.json",
+                        help="geometria z tools/godot/dump_meshes.gd")
     args = parser.parse_args()
     out_dir = pathlib.Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -576,7 +626,7 @@ def main():
     props_mock(out_dir)
     units_sheet(out_dir)
     icons_sheet(out_dir)
-    vehicles_mock(out_dir)
+    vehicles_mock(out_dir, args.meshes)
 
 
 if __name__ == "__main__":
