@@ -11,3 +11,6 @@ export_presets.cfg
 # System
 .DS_Store
 Thumbs.db
+
+# Surowe obrazy AI (~21 MB) — odtwarzalne z promptów w assets/textures/terrain/README.md
+tools/art/raw/
