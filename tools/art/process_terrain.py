@@ -24,7 +24,9 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 DEFAULT_OUT = PROJECT_ROOT / "assets" / "textures" / "terrain"
 
 MASTER_SIZE = 512
-TILE_SIZE = 64
+# Mapa kampanii rysuje jedno pole w rozmiarze 16 px, więc kafel ma dokładnie
+# tyle pikseli — dzięki temu Godot nie skaluje go i nic się nie rozmywa.
+TILE_SIZE = 16
 MASTER_BLEND = 0.55  # 0 = tylko przemalowanie w palecie, 1 = tylko korekta średniej
 
 # Paleta z scripts/campaign_view.gd (COLORS) — kolejność jak Terrain.Kind.

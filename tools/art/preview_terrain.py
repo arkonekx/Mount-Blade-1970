@@ -72,8 +72,8 @@ def contact_sheet(out_dir):
 
     draw.text((pad + 4, 26), "Zimna Wojna 1975 — tekstury terenu (AI)", font=f_title, fill=FG)
     draw.text((pad + 6, 78),
-              "hand-painted map texture · 512×512 (materiały 3D) + 64×64 (kafle mapy) · "
-              "paleta z campaign_view.gd", font=f_sub, fill=DIM)
+              "hand-painted map texture · 512×512 (materiały 3D) + 16×16 (kafle mapy) · "
+              "paleta i kolor wymuszony programowo", font=f_sub, fill=DIM)
 
     for index, (key, name) in enumerate(KINDS):
         x = pad + (index % cols) * (cell + pad)
@@ -89,7 +89,7 @@ def contact_sheet(out_dir):
         rgb = PALETTE[key]
         draw.text((x + 2, y + cell + 34),
                   f"paleta #{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X} · "
-                  f"{'512+64 px' if has(key) else 'kolor zastępczy'}", font=f_num, fill=DIM)
+                  f"{'512 + 16 px' if has(key) else 'kolor zastępczy'}", font=f_num, fill=DIM)
 
     path = out_dir / "arkusz_tekstur.png"
     sheet.save(path, "PNG")
@@ -108,9 +108,9 @@ def campaign_map_preview(out_dir, seed):
     map_img = Image.new("RGB", (w * scale, h * scale), BG)
     cache = {}
     for key, _ in KINDS:
-        img = load(key, scale)
-        if img is not None:
-            cache[key] = img
+        tile_path = TILES / f"{key}.png"
+        if tile_path.exists():
+            cache[key] = Image.open(tile_path).convert("RGB")  # dokładnie plik z gry
     draw = ImageDraw.Draw(map_img)
     for y in range(h):
         for x in range(w):
