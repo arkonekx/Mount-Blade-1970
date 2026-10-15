@@ -107,6 +107,8 @@ tools/art/process_props.py          surowe obrazy → materiały otoczenia
 tools/art/process_units.py          surowe obrazy → materiały sprzętu
 tools/art/process_icons.py          surowe ikony → PNG z przezroczystością
 tools/art/preview_textures.py       arkusze kontaktowe + makiety
+tools/art/render_units.py           renderer brył z gry (bez okna graficznego)
+tools/godot/dump_meshes.gd          zrzut geometrii jednostek z battle_view.gd
 assets/textures/*/README.md         palety, prompty, instrukcja odtworzenia
 ```
 
@@ -132,6 +134,21 @@ a wtedy Godot nie ma jeszcze zaimportowanych zasobów. Gdyby jakiejś tekstury
 brakowało, mapa wraca do płaskich kolorów z `COLORS` — gra się nie wywala.
 Przy eksporcie dodaj `assets/textures/terrain/*.png` do filtra plików
 niezasobowych w presecie eksportu.
+
+## Podgląd bez okna graficznego
+
+Środowisko bez serwera graficznego nie pozwala zrobić zrzutu ekranu z gry
+(Godot w `--headless` nie renderuje). Zamiast tego geometria jest zrzucana
+z gry, a obraz składa renderer w Pythonie:
+
+```bash
+godot --headless --path . -s res://tools/godot/dump_meshes.gd -- /tmp/art/units.json
+python3 tools/art/render_units.py --meshes /tmp/art/units.json --out /tmp/art/out
+```
+
+Bryły, rozmiary, pozycje, barwy i tekstury są 1:1 z gry; oświetlenie i rzut to
+przybliżenie (szczegóły w `tools/godot/README.md`). To samo narzędzie daje
+podglądy tekstur i makiety: `tools/art/preview_textures.py`.
 
 ## Testy
 

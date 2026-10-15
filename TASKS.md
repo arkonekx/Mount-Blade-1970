@@ -90,6 +90,10 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `tests/test_views.gd` — składa obie sceny jak gra i sprawdza liczbę brył
       w sylwetkach (piechur ≥ 2, wóz ≥ 12, czołg ≥ 14) oraz to, że materiały
       naprawdę mają tekstury AI
+- [x] podgląd brył bez okna graficznego: `tools/godot/dump_meshes.gd` zrzuca
+      geometrię z `battle_view.gd` (16/13/2 bryły), a `tools/art/render_units.py`
+      renderuje ją w Pythonie (numpy + Pillow) — kształt, barwy i tekstury 1:1
+      z gry, oświetlenie i rzut są przybliżeniem
 - [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
