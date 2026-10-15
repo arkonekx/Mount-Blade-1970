@@ -1,0 +1,13 @@
+# Godot 4+ — pamięć podręczna edytora (generowana lokalnie)
+.godot/
+
+# Ustawienia eksportu (zależą od maszyny)
+export.cfg
+export_presets.cfg
+
+# Tłumaczenia generowane z plików CSV
+*.translation
+
+# System
+.DS_Store
+Thumbs.db
