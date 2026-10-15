@@ -14,3 +14,7 @@ Thumbs.db
 
 # Surowe obrazy AI (~21 MB) — odtwarzalne z promptów w assets/textures/terrain/README.md
 tools/art/raw/
+
+# Cache Pythona
+__pycache__/
+*.pyc
