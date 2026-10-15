@@ -92,29 +92,64 @@ func _test_battle_view() -> void:
 
 	print("  jednostek: %d, sylwetki: %s, brył z teksturą: %d, unikalnych materiałów: %d"
 		% [sim.units.size(), str(counts), textured, unique_materials.size()])
-	await _test_variants(view)
+	await _test_shapes(view)
 
 	view.free()
 
 
-func _test_variants(view) -> void:
-	# Sylwetka ma dwa warianty: NATO (wieża skrzynkowa) i ZSRR (kopuła).
-	# Sprawdzamy, że warianty faktycznie różnią się geometrią, ale mają tę
-	# samą, zadeklarowaną liczbę brył.
-	for cls in [UnitsData.CLS_MECH, UnitsData.CLS_ARMOR]:
-		var nato: Array = view._tank_parts("us") if cls == UnitsData.CLS_ARMOR else view._mech_parts("us")
-		var su: Array = view._tank_parts("su") if cls == UnitsData.CLS_ARMOR else view._mech_parts("su")
-		_check(nato.size() == su.size(), "%s: warianty mają różną liczbę brył (%d vs %d)"
-			% [cls, nato.size(), su.size()])
-		var gaps: int = 0
-		for i in range(mini(nato.size(), su.size())):
-			var a: Vector3 = nato[i]["pos"]
-			var b: Vector3 = su[i]["pos"]
-			if a.distance_to(b) > 0.02:
-				gaps += 1
-		_check(gaps >= 3, "%s: warianty NATO i ZSRR są prawie identyczne (%d różnic w położeniu)"
-			% [cls, gaps])
-		print("  %s: warianty NATO/ZSRR — %d brył, %d różnych detali" % [cls, nato.size(), gaps])
+func _test_shapes(view) -> void:
+	# Każda rodzina wozów ma inny kształt, więc mierzymy je i porównujemy:
+	# dwie sylwetki o tej samej długości, wysokości i liczbie kół byłyby błędem.
+	var stats: Dictionary = {}
+	for def_id in ["us_arm_m60a1", "us_arm_m551", "su_arm_t55", "su_arm_t72"]:
+		stats[def_id] = _shape_stats(view, str(def_id), true)
+	for def_id in ["us_mech_m113", "su_mech_btr60", "su_mech_bmp1", "su_mech_mtlb"]:
+		stats[def_id] = _shape_stats(view, str(def_id), false)
+	var seen: Dictionary = {}
+	for def_id in stats:
+		var st: Dictionary = stats[def_id]
+		var key: String = "%d|%.1f|%.1f" % [st["wheels"], st["length"], st["height"]]
+		_check(not seen.has(key), "Sylwetki %s i %s są identyczne (%s)" % [def_id, seen.get(key, "?"), key])
+		seen[key] = def_id
+		print("  %-14s brył %d · dł. %.1f m · wys. %.1f m · kół i ogniw %d"
+			% [def_id, st["meshes"], st["length"], st["height"], st["wheels"]])
+	# Czołgi obu stron muszą mieć różną wysokość sylwetki (T-55/T-72 są niższe
+	# od M60), a wozy bojowe — różną liczbę kół (BTR-60 jest ośmiokołowy).
+	_check(float(stats["su_arm_t72"]["height"]) < float(stats["us_arm_m60a1"]["height"]),
+		"T-72 nie jest niższy od M60A1 — sylwetki nie trzymają się prawdziwych proporcji")
+	_check(float(stats["us_arm_m551"]["height"]) < float(stats["us_arm_m60a1"]["height"]),
+		"M551 Sheridan nie jest niższy od M60A1")
+	_check(str(stats["su_mech_btr60"]["tracked"]) == "0",
+		"BTR-60 nie powinien mieć gąsienic")
+
+
+## Miary sylwetki: liczba brył, obrys (długość i wysokość) oraz liczba brył
+## podwozia (tekstura gąsienic albo kół).
+func _shape_stats(view, def_id: String, armor: bool) -> Dictionary:
+	var parts: Array = view._armor_parts(def_id) if armor else view._mech_parts(def_id)
+	var x_min: float = 1e9
+	var x_max: float = -1e9
+	var y_max: float = 0.0
+	var tracked: int = 0
+	for part in parts:
+		var pos: Vector3 = part["pos"]
+		var size := Vector3(0.1, 0.1, 0.1)
+		match str(part["prim"]):
+			"box":
+				size = part["size"]
+			"cyl":
+				size = Vector3(float(part["bottom"]) * 2.0, float(part["height"]), float(part["bottom"]) * 2.0)
+			"sphere":
+				size = Vector3(float(part["radius"]) * 2.0, float(part["height"]), float(part["radius"]) * 2.0)
+		x_min = minf(x_min, pos.x - size.x * 0.5)
+		x_max = maxf(x_max, pos.x + size.x * 0.5)
+		if minf(size.x, minf(size.y, size.z)) >= 0.4:
+			# wysokość bez anten i prętów — inaczej mierzymy czubek anteny
+			y_max = maxf(y_max, pos.y + size.y * 0.5)
+		if str(part["tex"]) == "track" and str(part["prim"]) == "box":
+			tracked += 1  # ogniwo gąsienicy (koła są walcami)
+	return {"meshes": parts.size(), "length": x_max - x_min, "height": y_max,
+		"wheels": tracked, "tracked": tracked}
 
 
 func _test_campaign_view() -> void:
@@ -132,8 +167,10 @@ func _test_campaign_view() -> void:
 	view.free()
 
 
+## Liczy bryły pojazdu; pierścień strony to znacznik interfejsu, nie część
+## sylwetki, więc go pomijamy.
 func _count_meshes(node: Node) -> int:
-	var total: int = 1 if node is MeshInstance3D else 0
+	var total: int = 1 if node is MeshInstance3D and node.name != "side_ring" else 0
 	for child in node.get_children():
 		total += _count_meshes(child)
 	return total

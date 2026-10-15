@@ -41,7 +41,7 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `tests/test_save.gd`
 - [x] `tests/test_playthrough.gd` — cała rozgrywka bez okna: bot maszeruje do celów,
       rozgrywa bitwy symulatorem, robi zapis/odczyt w trakcie kampanii
-- [x] `run_tests.sh` — pięć testów + sceny, wynik `RESULT: PASS/FAIL`
+- [x] `run_tests.sh` — siedem testów + sceny, wynik `RESULT: PASS/FAIL`
 - [x] **Uruchomione na prawdziwym Godocie 4.7.2: `RESULT: PASS`** (2026-10-15)
 
 ### Etap 6 — bitwa FPS
@@ -104,6 +104,30 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `makieta_pojazdow.png` to rzut techniczny **prawdziwych brył** z tego
       zrzutu (rysowany w `preview_textures.py`), więc nie może się rozjechać
       z kodem
+- [x] **osobna geometria dla każdego wozu** (nie dwa warianty stron): osiem
+      funkcji budujących — `_patton_parts` (M48A5: okrągły nos odlewu / M60A1:
+      klinowy nos + reflektor AN/VSS-1), `_sheridan_parts` (M551: niski, pięć
+      kół, napęd z przodu), `_t54_parts` (T-55: 100 mm / T-62: 115 mm),
+      `_t72_parts` (125 mm, snorkiel, najniższa kopuła), `_m113_parts` (M113
+      i wozówka M577), `_btr60_parts` (cztery osie na stronę), `_bmp1_parts`
+      (działo 73 mm + 9M14), `_mtlb_parts` (mała wieżyczka, most MTU-20)
+- [x] **barwy fabryczne zamiast koloru strony**: olive drab USA i zieleń 4BO
+      ZSRR (kolory rozjaśnione, bo poprzednie rendery wychodziły niemal czarne);
+      przynależność w bitwie pokazuje pierścień na ziemi
+- [x] **oznaczenia państwowe na pancerzu**: `assets/textures/markings/`
+      (`star_us.png`, `star_su.png`, 128×128 RGBA, generator
+      `tools/art/make_markings.py`), w `game_textures.gd` klucz `marking`,
+      w `battle_view.gd` `_star_plate()` — płaska gwiazda na dachu (identyfikacja
+      z powietrza, jak w rzeczywistości) plus gwiazdy na burtach wieży i kadłuba;
+      `_part_marking()` przyjmuje rozmiar, pozycję, obrót i klucz tekstury
+- [x] gwiazdy powstają **przed** gąsienicami w każdej funkcji budującej —
+      `_fit_parts()` dopełnia i ucina od końca listy, więc dokładane na końcu
+      oznaczenia były po cichu ucinane (czołgi miały 0 gwiazd)
+- [x] zrzut rozszerzony do 13 wozów (`dump_meshes.gd`, 2 196 brył), render
+      `render_units.py` daje pięć obrazów: park czołgów, wozy bojowe, cztery
+      ujęcia M60A1 (z gwiazdą na dachu widoczną z góry), barwy fabryczne
+      i jednostki w jednej skali; `preview_textures.py` rysuje gwiazdy
+      w makiecie (białe USA, czerwone ZSRR) i wybiera wozy po `def_id`
 - [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
@@ -151,10 +175,13 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
   ~2800 jednostek kompilacji) — bo wydania GitHub nie dają się w tym środowisku
   pobrać. Wynik: `4.7.2.stable.custom_build`, działa bez okna.
 - Wszystkie testy i obie sceny zostały faktycznie uruchomione na tej binarke:
-  pięć testów logiki = PASS, sceny `campaign` i `battle` startują bez błędów
+  siedem testów = PASS, sceny `campaign` i `battle` startują bez błędów
   skryptów (`--quit-after 300`).
-- Liczba testów wzrosła do ośmiu: `test_textures` pilnuje kompletu tekstur,
-  a `test_views` składa obie sceny i sprawdza sylwetki jednostek oraz HUD.
+- Liczba testów wzrosła do siedmiu: `test_textures` pilnuje kompletu tekstur,
+  a `test_views` składa obie sceny i sprawdza sylwetki jednostek (dokładne
+  liczby brył, unikalne proporcje wozów, brak gąsienic w BTR-60PB) oraz HUD.
+  Stan na koniec etapu grafiki: 9 jednostek, `{piechur 10, wóz 128, czołg 256}`
+  brył, 513 brył z teksturą AI, 33 unikalne materiały (limit 64).
 - Analiza statyczna całego projektu (`@gdscript-analyzer/core` 0.6.1):
   **0 błędów, 0 ostrzeżeń** (pole `seed` w `campaign.gd` zmienione na
   `world_seed`, żeby nie przesłaniało globalnej funkcji `seed()`; klucz w pliku

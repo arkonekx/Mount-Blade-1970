@@ -17,6 +17,7 @@ const TILE_DIR := TERRAIN_DIR + "/tiles"
 const PROP_DIR := "res://assets/textures/props"
 const UNIT_DIR := "res://assets/textures/units"
 const ICON_DIR := "res://assets/textures/icons"
+const MARKING_DIR := "res://assets/textures/markings"
 
 ## Klucze w kolejności `Terrain.Kind` z scripts/logic/terrain.gd.
 const KEYS: Array = [
@@ -34,11 +35,15 @@ const UNIT_KEYS: Array = ["uniform", "armor", "track"]
 ## Klucze ikon interfejsu — kolejność jak w tools/art/process_icons.py.
 const ICON_KEYS: Array = ["player", "enemy", "objective", "city", "boat", "scout"]
 
+## Klucze oznaczeń państwowych malowanych na pojazdach (tools/art/make_markings.py).
+const MARKING_KEYS: Array = ["star_us", "star_su"]
+
 static var _masters: Dictionary = {}
 static var _tiles: Dictionary = {}
 static var _props: Dictionary = {}
 static var _units: Dictionary = {}
 static var _icons: Dictionary = {}
+static var _markings: Dictionary = {}
 
 
 ## Tekstura 512×512 dla materiału 3D (albo null, gdy pliku brak).
@@ -80,6 +85,18 @@ static func unit(key: String) -> Texture2D:
 ## Ikona interfejsu (RGBA, wycięta z tła) albo null.
 static func icon(key: String) -> Texture2D:
 	return _load_named(_icons, ICON_DIR, key)
+
+
+## Oznaczenie państwowe na pancerzu (RGBA) albo null.
+static func marking(key: String) -> Texture2D:
+	return _load_named(_markings, MARKING_DIR, key)
+
+
+static func all_markings_available() -> bool:
+	for key in MARKING_KEYS:
+		if marking(str(key)) == null:
+			return false
+	return true
 
 
 static func all_units_available() -> bool:

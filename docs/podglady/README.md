@@ -4,37 +4,51 @@ Obrazki poglądowe generowane narzędziami z `tools/` — do oglądania bez
 uruchamiania gry (środowisko robocze nie ma serwera graficznego, więc Godot
 w `--headless` nie renderuje obrazu).
 
+Wszystkie rendery poniżej powstają z **prawdziwej geometrii gry**: skrypt
+`tools/godot/dump_meshes.gd` woła te same funkcje budujące świat bitwy, których
+używa `battle_view.gd`, i zapisuje bryły do JSON-a. Renderer tylko je oświetla.
+
 ---
 
-## Czołg z gry — 256 brył
+## Czołgi 1975 — cały park sprzętu w jednej skali
 
-Geometria i tekstury pochodzą **z gry**: zrzut robi skrypt, który woła te same
-funkcje budujące świat bitwy co `battle_view.gd`. Sylwetka jest wzorowana na
-prawdziwych wozach z 1975 roku — NATO: M48A5 / M60A1 (wieża skrzynkowa),
-ZSRR: T-55 / T-62 (kopuła odlewana). Kadłub ma pochyłe płyty pancerza,
-błotniki z fartuchami, 5 kół jezdnych na stronę, rolki powrotne, jarzmo lufy,
-włazy, anteny i wyposażenie zewnętrzne.
+M60A1/M48A5 (długa lufa 105 mm z przedmuchiwaczem, wysoka wieża odlewana z
+koszem, 6 kół jezdnych, 3 rolki), M551 Sheridan (niski, lekki, 5 dużych kół,
+napęd z przodu), T-55/T-62 (kopuła odlewana, 5 dużych kół, beczki paliwa na
+błotniku), T-72 Ural (najniższy, 125 mm z rurą snorkla). Każdy wóz ma
+dokładnie 256 brył, ale inne proporcje:
 
-![Czołg z gry w czterech ujęciach](czolg_z_gry.jpg)
+![Park czołgów 1975 w jednej skali](render_porownanie.jpg)
 
-## Sylwetka NATO i ZSRR — dwie różne wieże
+## Wozy bojowe — kołowy, gąsienicowy, każdy inny
 
-Jedna funkcja budująca, dwa warianty: kopuła z odlewu i wieża skrzynkowa.
-Czołg i wóz bojowy każdej strony wyglądają inaczej, choć mają dokładnie
-256 (czołg) i 128 (wóz) brył.
+M113 (pudełko z falochronem i rampą, napęd z przodu), BTR-60PB (osiem kół,
+cztery osie na stronę — jedyny wóz kołowy w grze), BMP-1 (niski klin z
+działem 73 mm i wyrzutnią 9M14), MT-LB (najniższy ciągnik). Każdy ma 128 brył:
 
-![Warianty sylwetek: NATO i ZSRR](warianty_silwetek.jpg)
+![Wozy bojowe w jednej skali](render_wozy.jpg)
 
-## Ta sama tekstura, trzy barwy stron
+## M60A1 — 256 brył, cztery ujęcia
 
-W grze kolor strony jest mnożony przez teksturę sprzętu, więc detal (nity,
-spoiny, ogniwa) zostaje, a przynależność widać od razu.
+Ten sam wóz z kamery gracza, z boku, z przodu i z góry. Na dachu wieży jest
+płaska gwiazda — tak jak w rzeczywistości malowano oznaczenia do identyfikacji
+z powietrza; z boku widać gwiazdy na burtach kadłuba i wieży:
 
-![Czołg w barwach gracza, sojusznika i wroga](czolg_barwy_stron.jpg)
+![Czołg M60A1 w czterech ujęciach](render_czolg.jpg)
 
-## Jednostki w jednej skali
+## Barwy fabryczne — stronę poznaje się po sylwetce i oznaczeniu
 
-![Czołg, wóz bojowy i piechur w jednej skali](jednostki_skala.jpg)
+olive drab (USA) kontra zieleń 4BO (ZSRR), gwiazda państwowa na burtach;
+w bitwie przynależność jednostki pokazuje dodatkowo pierścień na ziemi:
+
+![Barwy fabryczne: M60A1, T-55, M113, BTR-60PB](render_warianty.jpg)
+
+## Jednostki gracza w jednej skali
+
+Czołg (256 brył), wóz bojowy (128) i piechur (10) — te same funkcje
+budujące, ta sama ziemia i światło. Piechur jest tu dla skali:
+
+![Czołg, wóz bojowy i piechur w jednej skali](render_jednostki.jpg)
 
 ---
 
@@ -48,7 +62,7 @@ Sprowadzone programowo do jednej palety, więc mapa nie wygląda jak kolaż.
 
 ![Arkusz tekstur otoczenia](arkusz_otoczenia.jpg)
 
-## Tekstury sprzętu (2)
+## Tekstury sprzętu (3)
 
 ![Arkusz tekstur sprzętu](arkusz_jednostek.jpg)
 
@@ -69,9 +83,9 @@ Tekstury otoczenia na bryłach, które buduje `battle_view.gd`:
 
 ![Makieta otoczenia](makieta_otoczenia.jpg)
 
-Rzut z boku **prawdziwych brył** pojazdów — dane zrzucone z gry skryptem
-`tools/godot/dump_meshes.gd`, więc schemat nie może się rozjechać z kodem.
-Widać każde ogniwo gąsienicy, każde koło i każdą płytę pancerza osobno:
+Rzut z boku **prawdziwych brył** pojazdów z podziałką metrową. Widać każde
+ogniwo gąsienicy, każde koło i każdą płytę pancerza osobno, a gwiazdy to
+płytki oznaczeń (białe USA, czerwone ZSRR):
 
 ![Makieta pojazdów — rzut brył z boku](makieta_pojazdow.jpg)
 
@@ -83,17 +97,17 @@ Widać każde ogniwo gąsienicy, każde koło i każdą płytę pancerza osobno:
 | --- | --- |
 | arkusze tekstur, ikon i otoczenia | **1:1** — to wprost pliki z `assets/` |
 | `mapa_kampanii_seed1` | **dane i kafle 1:1** — prawdziwy seed z `tests/ref_map.json`; wrogowie i zwiadowca to znaczniki przykładowe |
-| `czolg_z_gry`, `czolg_barwy_stron`, `jednostki_skala`, `warianty_silwetek` | **geometria, barwy i tekstury 1:1** z gry; oświetlenie i rzut to przybliżenie renderera (Godot inaczej tonuje obraz) — szczegóły w `tools/godot/README.md` |
+| `render_porownanie`, `render_wozy`, `render_czolg`, `render_warianty`, `render_jednostki` | **geometria, proporcje, barwy i tekstury 1:1** z gry; oświetlenie i rzut to przybliżenie renderera (Godot inaczej tonuje obraz) — szczegóły w `tools/godot/README.md` |
 | `makieta_pojazdow` | **bryły i wymiary 1:1** (rzut ortograficzny z prawdziwej geometrii); wygląd powierzchni uproszczony do płaskich barw stron |
 
 ## Odtworzenie
 
 ```bash
-pip install numpy pillow
+pip install --break-system-packages numpy pillow
 
 # tekstury i makiety
 python3 tools/art/preview_textures.py --out /tmp/art/out
-python3 tools/art/preview_textures.py --out /tmp/art/out --seed 42
+python3 tools/art/preview_textures.py --out /tmp/art/out --seed 42 --meshes /tmp/art/units.json
 
 # render jednostek z prawdziwej geometrii gry
 godot --headless --path . -s res://tools/godot/dump_meshes.gd -- /tmp/art/units.json

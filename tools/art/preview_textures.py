@@ -24,6 +24,21 @@ import json
 import pathlib
 from PIL import Image, ImageDraw, ImageFont
 
+# oznaczenia na pancerzu: bryły z tymi teksturami rysujemy jako gwiazdę,
+# nie jako prostokąt (makieta nie próbkuje tekstur)
+STAR_TEX = {"star_us": (246, 247, 242), "star_su": (198, 44, 38)}
+
+
+def _star_points(cx, cy, r, inner=0.42):
+    """Wierzchołki pięcioramiennej gwiazdy (10 punktów, na przemian R i r)."""
+    import math
+    pts = []
+    for i in range(10):
+        ang = -math.pi / 2 + i * math.pi / 5
+        rad = r if i % 2 == 0 else r * inner
+        pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+    return pts
+
 PROJECT = pathlib.Path(__file__).resolve().parents[2]
 TERRAIN = PROJECT / "assets" / "textures" / "terrain"
 TILES = TERRAIN / "tiles"
@@ -348,7 +363,13 @@ def _load_units_json(meshes_path):
     if not path.exists():
         return None
     data = json.loads(path.read_text())
-    return {(str(u["cls"]), str(u["side"])): u for u in data["units"]}
+    units = {}
+    for u in data["units"]:
+        # klucz podstawowy: identyfikator jednostki z units_data.gd,
+        # zapasowy: para (klasa, strona) — na wypadek starszego dumpu
+        units[str(u.get("def_id") or u.get("name") or "")] = u
+        units.setdefault((str(u["cls"]), str(u["side"])), u)
+    return units
 
 
 def _unit_extents(unit):
@@ -411,7 +432,7 @@ def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
     draw.text((22, 18), "Makieta pojazdów — bryły z battle_view.gd, rzut z boku",
               font=ImageFont.truetype(FONT_BOLD, 30), fill=FG2)
     draw.text((24, 56), "prawdziwa geometria z gry (tools/godot/dump_meshes.gd) · wspólna skala · "
-                        "obrys = pojedyncza bryła",
+                        "obrys = pojedyncza bryła · gwiazda = oznaczenie na pancerzu",
               font=ImageFont.truetype(FONT, 17), fill=DIM2)
 
     def draw_unit(unit, center_x, base_y):
@@ -430,12 +451,25 @@ def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
             return base_y - y * ppm
 
         # od najdalszych brył do najbliższych, żeby bliższy bok zasłaniał dalszy
-        for verts, _uvs, _tex, albedo in sorted(tris, key=lambda t: sum(v[2] for v in t[0])):
+        for verts, _uvs, tex, albedo in sorted(tris, key=lambda t: sum(v[2] for v in t[0])):
+            if tex in STAR_TEX:
+                continue               # oznaczenia rysujemy jako gwiazdę, patrz niżej
             depth = sum(v[2] for v in verts) / 3.0
             shade = 0.74 + 0.26 * (depth - (z_mid - z_half)) / (2 * z_half)
             color = tuple(int(max(0, min(255, c * 255 * shade))) for c in albedo[:3])
             edge = tuple(int(c * 0.42) for c in color)
             draw.polygon([(px(float(v[0])), py(float(v[1]))) for v in verts], fill=color, outline=edge)
+        # Jedna gwiazda na płytkę oznaczenia. W rzucie z boku widać tylko
+        # gwiazdy na burtach — płyty na dachu i na tyle są tu krawędzią.
+        for mesh in unit["meshes"]:
+            tex = mesh.get("texture")
+            if tex not in STAR_TEX or abs(float(mesh["position"][2])) < 0.5:
+                continue
+            size = [float(v) for v in mesh["size"]]
+            r = max(4.5, min(15.0, 0.45 * max(size[0], size[1]) * ppm))
+            draw.polygon(_star_points(px(float(mesh["position"][0])),
+                                      py(float(mesh["position"][1])), r),
+                         fill=STAR_TEX[tex], outline=(24, 24, 24))
         belts = sum(1 for m in unit["meshes"] if m.get("texture") == "track")
         return belts
 
@@ -453,20 +487,20 @@ def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
         draw.text((x0 + 3 * ppm, y + 8), "3 m", font=ImageFont.truetype(FONT, 14), fill=DIM2, anchor="ma")
 
     rows = [
-        (380, [(330, "armor", "gracz", "czołg NATO — M48A5 / M60A1"),
-               (1000, "armor", "wróg", "czołg ZSRR — T-55 / T-62")]),
-        (665, [(330, "mech", "gracz", "wóz bojowy NATO — M113"),
-               (1000, "mech", "wróg", "wóz bojowy ZSRR — BMP-1 / BTR-60")]),
+        (380, [(330, "us_arm_m60a1", "czołg NATO — M60A1 (256 brył)"),
+               (1000, "su_arm_t55", "czołg ZSRR — T-55 (256 brył)")]),
+        (665, [(330, "us_mech_m113", "wóz bojowy NATO — M113 (128 brył)"),
+               (1000, "su_mech_bmp1", "wóz bojowy ZSRR — BMP-1 (128 brył)")]),
     ]
     for base_y, entries in rows:
         draw.line([(20, base_y), (w - 20, base_y)], fill=GROUND, width=2)
-        for center_x, cls, side, caption in entries:
-            unit = units.get((cls, side))
+        for center_x, def_id, caption in entries:
+            unit = units.get(def_id)
             if unit is None:
                 continue
             belts = draw_unit(unit, center_x, base_y)
             length, height, hull = _unit_extents(unit)
-            draw.text((center_x, base_y + 16), f"{caption} · {len(unit['meshes'])} brył",
+            draw.text((center_x, base_y + 16), caption,
                       font=ImageFont.truetype(FONT_BOLD, 19), fill=FG2, anchor="ma")
             draw.text((center_x, base_y + 44),
                       f"dł. {length:.1f} m · wys. do wieży {hull:.1f} m · z antenami {height:.1f} m · "
@@ -474,7 +508,7 @@ def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
                       font=ImageFont.truetype(FONT, 15), fill=DIM2, anchor="ma")
         ruler(60, base_y - 150)
 
-    infantry = units.get(("infantry", "gracz"))
+    infantry = units.get("us_inf_m16")
     if infantry is not None:
         base_y = 665
         draw_unit(infantry, 1390, base_y)

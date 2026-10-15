@@ -100,6 +100,8 @@ assets/textures/props/<klucz>.png          256×256  — otoczenie: pnie, korony
 assets/textures/units/<klucz>.png          256×256  — sprzęt: mundur, pancerz,
                                                        ogniwa gąsienicy
 assets/textures/icons/<klucz>.png          128×128  — ikony mapy (RGBA)
+assets/textures/markings/<klucz>.png       128×128  — oznaczenia państwa
+                                                       (gwiazdy, RGBA)
 scripts/logic/game_textures.gd      loader tekstur (z zapasem na płaskie kolory)
 tools/art/pipeline.py               rdzeń: dopasowanie kolorystyki obrazu
 tools/art/process_terrain.py        surowe obrazy → kafle i materiały terenu
@@ -108,31 +110,50 @@ tools/art/process_units.py          surowe obrazy → materiały sprzętu
 tools/art/process_icons.py          surowe ikony → PNG z przezroczystością
 tools/art/preview_textures.py       arkusze kontaktowe + makiety
 tools/art/render_units.py           renderer brył z gry (bez okna graficznego)
+tools/art/make_markings.py          gwiazdy państwowe na pancerz (RGBA)
 tools/godot/dump_meshes.gd          zrzut geometrii jednostek z battle_view.gd
 assets/textures/*/README.md         palety, prompty, instrukcja odtworzenia
 ```
 
 Zestaw: 13 rodzajów terenu (kafle mapy i materiały gruntu bitwy), 5 tekstur
 otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 3 tekstury
-sprzętu (mundur, pancerz, ogniwa gąsienicy) i 6 ikon mapy (gracz, wróg, cel,
-miasto, łódź, zwiadowca).
+sprzętu (mundur, pancerz, ogniwa gąsienicy), 6 ikon mapy (gracz, wróg, cel,
+miasto, łódź, zwiadowca) i 2 oznaczenia państwa (biała gwiazda USA, czerwona
+gwiazda ZSRR).
 
-Sylwetki pojazdów są składane z setek brył i wzorowane na prawdziwych wozach
-z 1975 roku: czołg ma **256 brył** (kadłub z pochyłymi płytami pancerza,
-błotniki z fartuchami, dwie gąsienice z ogniwami, po pięć kół jezdnych i rolki
-powrotne na stronę, wieża z jarzmem i lufą z wylotem, włazy, anteny, reflektory,
-wyposażenie zewnętrzne), a wóz bojowy **128 brył** (te same elementy w mniejszej
-skali). Piechur to 10 brył: ciało, hełm, plecak, kończyny i broń. Sylwetka ma
-dwa warianty — NATO (wieża skrzynkowa, wzór M48A5/M60A1) i ZSRR (kopuła
-odlewana, wzór T-55/T-62) — wybierane automatycznie po stronie jednostki.
-Bryły dzielą wspólne materiały (`_material_cache`), więc mimo tysiąca brył
-w bitwie powstaje kilkadziesiąt materiałów, a nie tysiące.
+Sylwetki pojazdów są składane z setek brył, ale **każdy wóz ma własną funkcję
+budującą**, wzorowaną na prawdziwym pierwowzorze z 1975 roku: czołg ma **256
+brył** (pochyłe płyty pancerza, fartuchy błotników, dwie gąsienice z ogniwami,
+koła jezdne i rolki powrotne, wieża z jarzmem i lufą, włazy, anteny, reflektory,
+wyposażenie zewnętrzne), wóz bojowy **128 brył**, a piechur 10 brył (ciało, hełm,
+plecak, kończyny, broń). Różnice widać po sylwetce, nie po kolorze:
 
-Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez kolor strony
-(`albedo_color`): detal daje tekstura, a zielony gracz / niebiescy sojusznicy /
-czerwony wróg zostają czytelni. Ikony mają wycięte tło (alfa) i są projektowane
-pod skalę mapy — gruby obrys i prosta sylwetka. Przy braku któregokolwiek pliku
-gra wraca do płaskich kolorów i kształtów, więc nic się nie wywala.
+* **M48A5** — okrągły nos odlewu i krótsza lufa, **M60A1** — klinowy nos, dłuższa
+  lufa i reflektor AN/VSS-1 nad działem (oba działo 105 mm, sześć kół jezdnych),
+* **M551 Sheridan** — niski, lekki, pięć dużych kół, napęd z przodu, działo 152 mm,
+* **T-55** (działo 100 mm) i **T-62** (115 mm, dłuższa lufa) — kopuła odlewana,
+  pięć kół, beczki paliwa na błotniku,
+* **T-72 Ural** — najniższy z czołgów, działo 125 mm z koszulką termiczną i rura
+  do pokonywania przeszkód wodnych,
+* **M113** (pudełko z falochronem i rampą) i **M577** (wozówka dowodzenia z
+  wysokim przedziałem), **BTR-60PB** (jedyny wóz kołowy — cztery osie na stronę),
+  **BMP-1** (niski klin z działem 73 mm i wyrzutnią 9M14), **MT-LB** (najniższy
+  ciągnik, mała wieżyczka z km-em; wariant mostowy dokłada most MTU-20).
+
+Barwy są **fabryczne**: olive drab dla USA, zieleń 4BO dla ZSRR. Stronę rozpoznaje
+się po sylwetce i po gwieździe państwowej (`assets/textures/markings/`) — biała
+gwiazda USA na dachu wieży i burtach kadłuba, czerwona gwiazda ZSRR. Dopiero
+w bitwie przynależność jednostki pokazuje pierścień na ziemi (`COLOR_PLAYER`,
+`COLOR_FRIEND`, `COLOR_ENEMY`). Bryły dzielą wspólne materiały
+(`_material_cache`), więc mimo tysiąca brył w bitwie powstaje kilkadziesiąt
+materiałów, a nie tysiące.
+
+Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez barwę wozu
+(`albedo_color`): detal (nity, spoiny, ogniwa) daje tekstura, a kolor to
+fabryczna olive drab albo zieleń 4BO. Ikony mają wycięte tło (alfa) i są
+projektowane pod skalę mapy — gruby obrys i prosta sylwetka. Przy braku
+któregokolwiek pliku gra wraca do płaskich kolorów i kształtów, więc nic się
+nie wywala.
 
 Tekstury są wczytywane przez `Image.load_from_file` (a nie `load("res://…")`),
 bo projekt bywa uruchamiany bez otwartego edytora (`--headless` w testach),
@@ -169,9 +190,10 @@ chmod +x run_tests.sh
 GODOT=/ścieżka/do/godot ./run_tests.sh
 ```
 
-Skrypt uruchamia pięć testów logiki (`tests/test_map.gd`, `tests/test_campaign.gd`,
-`tests/test_battle.gd`, `tests/test_save.gd`, `tests/test_playthrough.gd`) i obie
-sceny, a na końcu wypisuje `RESULT: PASS` albo `RESULT: FAIL`.
+Skrypt uruchamia siedem testów (`tests/test_map.gd`, `tests/test_campaign.gd`,
+`tests/test_battle.gd`, `tests/test_save.gd`, `tests/test_playthrough.gd`,
+`tests/test_textures.gd`, `tests/test_views.gd`) i obie sceny, a na końcu
+wypisuje `RESULT: PASS` albo `RESULT: FAIL`.
 
 * `test_map` — determinizm generatora i zgodność z `tests/ref_map.json`.
 * `test_campaign` — ekonomia, marsz, zwiad, przeprawy, rozliczenie bitwy, zwycięstwo.

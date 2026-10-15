@@ -29,6 +29,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 UNIT_TEXTURES = PROJECT_ROOT / "assets" / "textures" / "units"
+MARKING_TEXTURES = PROJECT_ROOT / "assets" / "textures" / "markings"
 TERRAIN_TEXTURES = PROJECT_ROOT / "assets" / "textures" / "terrain"
 
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -40,9 +41,9 @@ FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 SUN_COLOR = np.array([1.0, 0.96, 0.88])
 SUN_ROT_DEG = (-55.0, 35.0, 0.0)
 AMBIENT_COLOR = np.array([0.70, 0.72, 0.78])
-AMBIENT_LEVEL = 0.46      # udział światła otoczenia (w grze scena jest płaska i jasna)
-SUN_LEVEL = 0.48          # udział słońca przy pełnym oświetleniu ściany
-FILL_LEVEL = 0.30         # doświetlenie ścian odwróconych od słońca
+AMBIENT_LEVEL = 0.58      # udział światła otoczenia (w grze scena jest płaska i jasna)
+SUN_LEVEL = 0.54          # udział słońca przy pełnym oświetleniu ściany
+FILL_LEVEL = 0.38         # doświetlenie ścian odwróconych od słońca
 SHADOW_STRENGTH = 0.42    # jak mocno cień przygasza grunt
 
 
@@ -159,20 +160,28 @@ def capsule_triangles(radius, height, segments, rings, uv_scale):
     return tris
 
 
-def sphere_triangles(radius, segments, rings, uv_scale):
+def sphere_triangles(radius, segments, rings, uv_scale, height=None, hemisphere=False):
+    """Kula, elipsoida (`height`) albo półkula (`hemisphere`) — jak SphereMesh.
+
+    Godot rysuje półkulę jako górną część kuli o promieniu `radius` ściśniętą
+    do wysokości `height`, więc i tutaj liczymy y = height·cos(phi).
+    """
     segments = max(6, int(segments))
     rings = max(3, int(rings))
     su, sv = uv_scale[0], uv_scale[1]
+    v_extent = float(height) if height else radius * 2.0
+    v_radius = v_extent * 0.5
+    phi_span = math.pi * 0.5 if hemisphere else math.pi
     tris = []
     for i in range(rings):
-        phi0 = math.pi * i / rings
-        phi1 = math.pi * (i + 1) / rings
+        phi0 = phi_span * i / rings
+        phi1 = phi_span * (i + 1) / rings
         for s in range(segments):
             t0 = 2.0 * math.pi * s / segments
             t1 = 2.0 * math.pi * (s + 1) / segments
             def point(phi, theta):
                 return np.array([math.sin(phi) * math.cos(theta) * radius,
-                                 math.cos(phi) * radius,
+                                 math.cos(phi) * v_radius,
                                  math.sin(phi) * math.sin(theta) * radius])
             p00, p10 = point(phi0, t0), point(phi0, t1)
             p11, p01 = point(phi1, t1), point(phi1, t0)
@@ -196,7 +205,9 @@ def mesh_triangles(mesh):
         return capsule_triangles(mesh["radius"], mesh["height"],
                                  mesh.get("radial_segments", 32), mesh.get("rings", 8), uv_scale)
     if prim == "sphere":
-        return sphere_triangles(mesh["radius"], 32, 16, uv_scale)
+        return sphere_triangles(mesh["radius"], mesh.get("radial_segments", 32),
+                                mesh.get("rings", 16), uv_scale,
+                                mesh.get("height"), bool(mesh.get("hemisphere", False)))
     return []
 
 
@@ -310,6 +321,7 @@ def render(triangles, cam, size, fov_deg, textures, ss=2, bg=(0.10, 0.12, 0.17),
             lambert = 1.0
         light = ambient + SUN_COLOR * (SUN_LEVEL * lambert + FILL_LEVEL * (1.0 - lambert))
 
+        cutout = None
         if tex_key is not None and tex_key in textures:
             tex = textures[tex_key]
             th, tw = tex.shape[0], tex.shape[1]
@@ -317,12 +329,21 @@ def render(triangles, cam, size, fov_deg, textures, ss=2, bg=(0.10, 0.12, 0.17),
             tv = np.mod(v * th, th).astype(np.int32)
             # Tekstury trzymamy w 0..255 — musimy znormalizować do 0..1,
             # inaczej po pomnożeniu przez światło wszystko się przepala.
-            sample = tex[tv, tu].astype(np.float32) / 255.0
+            pixel = tex[tv, tu].astype(np.float32)
+            if pixel.shape[-1] == 4:
+                # Oznaczenie państwowe: alfa wycina kształt gwiazdy (jak
+                # TRANSPARENCY_ALPHA_SCISSOR w grze), więc tło nie jest malowane.
+                cutout = pixel[..., 3] >= 127.0
+                sample = pixel[..., :3] / 255.0
+            else:
+                sample = pixel / 255.0
         else:
             sample = np.ones((py.shape[0], py.shape[1], 3), dtype=np.float32)
         shaded = np.clip(sample * albedo * light, 0.0, 1.0)
 
         update = inside & (z < depth[by0:by1 + 1, bx0:bx1 + 1])
+        if cutout is not None:
+            update = update & cutout
         if not update.any():
             continue
         depth[by0:by1 + 1, bx0:bx1 + 1][update] = z[update]
@@ -375,6 +396,11 @@ def load_textures():
         path = UNIT_TEXTURES / f"{key}.png"
         if path.exists():
             textures[key] = np.asarray(Image.open(path).convert("RGB"))
+    # Oznaczenia państwowe (gwiazdy) mają kanał alfa — renderer wycina nimi tło.
+    for key in ("star_us", "star_su"):
+        path = MARKING_TEXTURES / f"{key}.png"
+        if path.exists():
+            textures[key] = np.asarray(Image.open(path).convert("RGBA")).astype(np.float32)
     ground = TERRAIN_TEXTURES / "plains.png"
     if ground.exists():
         textures["plains"] = np.asarray(Image.open(ground).convert("RGB"))
@@ -405,6 +431,36 @@ def compose(views, title, subtitle, out_path, cell=(420, 320)):
           f"{pathlib.Path(out_path).stat().st_size // 1024} kB")
 
 
+## Wymiary sylwetki z danych gry: długość i wysokość korpusu (bez anten).
+def unit_dims(unit):
+    x_min, x_max, y_max = 0.0, 0.0, 0.0
+    for mesh in unit["meshes"]:
+        pos = mesh["position"]
+        prim = mesh["prim"]
+        if prim == "box":
+            size = mesh["size"]
+        elif prim == "cylinder":
+            size = [mesh["bottom_radius"] * 2, mesh["height"], mesh["bottom_radius"] * 2]
+        elif prim == "sphere":
+            size = [mesh["radius"] * 2, mesh["height"], mesh["radius"] * 2]
+        else:
+            size = [mesh.get("radius", 0.1) * 2, mesh.get("height", 0.1), mesh.get("radius", 0.1) * 2]
+        x_min = min(x_min, pos[0] - size[0] * 0.5)
+        x_max = max(x_max, pos[0] + size[0] * 0.5)
+        if min(size) >= 0.4:
+            y_max = max(y_max, pos[1] + size[1] * 0.5)
+    return x_max - x_min, y_max
+
+
+def side_view(unit, out_dir, title, subtitle, name, cell=(430, 330)):
+    """Jeden wóz z boku — do porównania sylwetek w jednej skali."""
+    cam = look_at((0.0, 2.6, 13.5), (0.0, 1.2, 0.0))
+    image = render_unit_scene(unit_triangles(unit), cam, cell, 34.0, load_textures(), ground_triangles())
+    length, height = unit_dims(unit)
+    caption = f"{unit['label']} · {len(unit['meshes'])} brył · {length:.1f} × {height:.1f} m"
+    compose([(image, caption)], title, subtitle, out_dir / name, cell)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Renderuje bryły jednostek z gry (bez okna).")
     parser.add_argument("--meshes", default="/tmp/art/units.json")
@@ -415,17 +471,12 @@ def main():
     out_dir = pathlib.Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     textures = load_textures()
-
-    units = {(str(u["cls"]), str(u["side"])): u for u in data["units"]}
-    tank = units[("armor", "gracz")]
-    tank_tris = unit_triangles(tank)
+    units = {str(u["def_id"]): u for u in data["units"]}
     ground = ground_triangles()
 
-    def parts(cls: str, side: str) -> int:
-        """Liczba brył faktycznie zbudowanych przez battle_view.gd."""
-        return len(units[(cls, side)]["meshes"])
-
+    # --- 1. Czołg M60A1 w czterech ujęciach (kamera gracza) ---
     cell = (430, 330)
+    tank = units["us_arm_m60a1"]
     views = []
     shots = [
         ("widok 3/4 (kamera gracza)", (10.5, 4.2, 8.6), (0.3, 1.0, 0.0), 42.0, (0.0, 1.0, 0.0)),
@@ -434,46 +485,63 @@ def main():
         ("widok z góry", (0.0, 12.0, 0.0), (0.0, 0.8, 0.0), 40.0, (0.0, 0.0, -1.0)),
     ]
     for caption, eye, target, fov, up in shots:
-        cam = look_at(eye, target, up)
-        image = render_unit_scene(tank_tris, cam, cell, fov, textures, ground)
+        image = render_unit_scene(unit_triangles(tank), look_at(eye, target, up), cell, fov, textures, ground)
         views.append((image, caption))
-    compose(views, f"Czołg z gry — {parts('armor', 'gracz')} brył, geometria i tekstury z battle_view.gd",
-            "sylwetka wzorowana na T-55/T-62 (kadłub 6,6 m, pochyły pancerz czołowy, kopuła wieży, 5 kół jezdnych, "
-            "błotniki, lufa z wylotem) · cieniowanie i rzut: przybliżenie (brak okna graficznego)",
+    compose(views, f"M60A1 — {len(tank['meshes'])} brył, geometria i barwy z battle_view.gd",
+            "kadłub 6,9 m · sześć kół jezdnych · trzy rolki · napęd z tyłu · wieża odlewana z koszem, "
+            "reflektor AN/VSS-1 nad działem 105 mm · biała gwiazda USA",
             out_dir / "render_czolg.png", cell)
 
-    # Trzy barwy stron + wóz bojowy i piechur dla skali.
+    # --- 2. Czołgi obu stron w jednej skali ---
+    cell = (430, 330)
     views = []
-    for side, caption in (("gracz", "barwa: gracz"), ("sojusznik", "barwa: sojusznik"), ("wróg", "barwa: wróg")):
-        cam = look_at((9.5, 4.6, 8.0), (0.0, 1.1, 0.0))
-        image = render_unit_scene(unit_triangles(units[("armor", side)]), cam, cell, 40.0, textures, ground)
-        views.append((image, caption))
-    compose(views, "Czołg w trzech barwach stron — ta sama tekstura, inny albedo_color",
-            "w grze kolor strony jest mnożony przez teksturę sprzętu, więc detal zostaje, a przynależność widać od razu",
-            out_dir / "render_czolg_barwy.png", cell)
+    for def_id in ("us_arm_m60a1", "us_arm_m551", "su_arm_t55", "su_arm_t72"):
+        unit = units[def_id]
+        cam = look_at((0.0, 2.6, 13.5), (0.0, 1.2, 0.0))
+        image = render_unit_scene(unit_triangles(unit), cam, cell, 34.0, textures, ground)
+        length, height = unit_dims(unit)
+        views.append((image, f"{unit['label']} · {length:.1f} × {height:.1f} m"))
+    compose(views, "Czołgi 1975 — cały park sprzętu w jednej skali",
+            "M60A1/M48A5 (6 kół, wysoka wieża), M551 Sheridan (niski, 5 kół, napęd z przodu), "
+            "T-55/T-62 (kopuła, 5 dużych kół, beczki paliwa), T-72 (najniższy, 6 kół)",
+            out_dir / "render_porownanie.png", cell)
 
+    # --- 3. Wozy bojowe obu stron ---
     views = []
-    for cls, caption in (("armor", f"czołg — {parts('armor', 'gracz')} brył"),
-                         ("mech", f"wóz bojowy — {parts('mech', 'gracz')} brył"),
-                         ("infantry", f"piechur — {parts('infantry', 'gracz')} brył")):
-        cam = look_at((9.0, 4.4, 7.6), (0.0, 1.1, 0.0))
-        image = render_unit_scene(unit_triangles(units[(cls, "gracz")]), cam, cell, 40.0, textures, ground)
-        views.append((image, caption))
-    compose(views, "Jednostki gracza w tej samej skali — tak zbuduje je bitwa",
-            "te same funkcje (_tank_parts / _mech_parts / _build_infantry), ta sama ziemia i światło",
-            out_dir / "render_jednostki.png", cell)
+    for def_id in ("us_mech_m113", "su_mech_btr60", "su_mech_bmp1", "su_mech_mtlb"):
+        unit = units[def_id]
+        cam = look_at((0.0, 2.4, 13.5), (0.0, 1.0, 0.0))
+        image = render_unit_scene(unit_triangles(unit), cam, cell, 34.0, textures, ground)
+        length, height = unit_dims(unit)
+        views.append((image, f"{unit['label']} · {length:.1f} × {height:.1f} m"))
+    compose(views, "Wozy bojowe 1975 — kołowy, gąsienicowe, każdy inny",
+            "M113 (pudełko z falochronem, napęd z przodu), BTR-60PB (osiem kół, cztery osie), "
+            "BMP-1 (niski klin, działko 73 mm), MT-LB (najniższy ciągnik)",
+            out_dir / "render_wozy.png", cell)
 
-    # Sylwetki stron: wóz z wieżą skrzynkową (US) obok wozu z kopułą (ZSRR).
+    # --- 4. Strony obok siebie: inna sylwetka, inne oznaczenie ---
     views = []
-    pairs = (("armor", "gracz", "czołg NATO (M48/M60) — wieża skrzynkowa"), ("armor", "wróg", "czołg ZSRR (T-55/T-62) — kopuła"),
-             ("mech", "gracz", "wóz NATO — wieża skrzynkowa"), ("mech", "wróg", "wóz ZSRR — kopuła"))
-    for cls, side, caption in pairs:
+    for def_id in ("us_arm_m60a1", "su_arm_t55", "us_mech_m113", "su_mech_btr60"):
+        unit = units[def_id]
         cam = look_at((8.6, 4.2, 7.4), (0.0, 1.1, 0.0))
-        image = render_unit_scene(unit_triangles(units[(cls, side)]), cam, cell, 40.0, textures, ground)
-        views.append((image, caption))
-    compose(views, "Sylwetki stron — NATO (wieża skrzynkowa) i ZSRR (kopuła)",
-            "jedna funkcja budująca, dwa warianty: kadłub, wieża, jarzmo i wyposażenie zmieniają się zależnie od strony",
+        image = render_unit_scene(unit_triangles(unit), cam, cell, 40.0, textures, ground)
+        star = "biała gwiazda" if unit["side"] == "us" else "czerwona gwiazda"
+        views.append((image, f"{unit['label']} · {star}"))
+    compose(views, "Barwy fabryczne — strony rozpoznaje się po sylwetce i oznaczeniu",
+            "olive drab USA i zieleń 4BO ZSRR, gwiazda państwowa na burtach; "
+            "w bitwie przynależność jednostki pokazuje pierścień na ziemi",
             out_dir / "render_warianty.png", cell)
+
+    # --- 5. Jednostki gracza w jednej skali (czołg, wóz, piechur) ---
+    views = []
+    for def_id in ("us_arm_m60a1", "us_mech_m113", "us_inf_m16"):
+        unit = units[def_id]
+        cam = look_at((9.0, 4.4, 7.6), (0.0, 1.1, 0.0))
+        image = render_unit_scene(unit_triangles(unit), cam, cell, 40.0, textures, ground)
+        views.append((image, f"{unit['label']} — {len(unit['meshes'])} brył"))
+    compose(views, "Jednostki gracza w tej samej skali — tak zbuduje je bitwa",
+            "te same funkcje (_armor_parts / _mech_parts / _build_infantry), ta sama ziemia i światło",
+            out_dir / "render_jednostki.png", cell)
 
 
 if __name__ == "__main__":

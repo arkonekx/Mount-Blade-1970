@@ -5,11 +5,15 @@ extends SceneTree
 ##   godot --headless --path . -s res://tools/godot/dump_meshes.gd -- /tmp/art/units.json
 ##
 ## Skrypt korzysta z tych samych funkcji, które budują świat bitwy
-## (`_build_infantry`, `_mech_parts`, `_tank_parts` w battle_view.gd), więc
+## (`_build_infantry`, `_mech_parts`, `_armor_parts` w battle_view.gd), więc
 ## w pliku ląduje dokładnie ta geometria, którą widzi gracz — bryła po bryle,
-## z rozmiarami, pozycjami, obrotami, kolorami i teksturami.
+## z rozmiarami, pozycjami, obrotami, kolorami i teksturami. Zrzucamy po jednym
+## przedstawicielu każdej rodziny wozów, żeby podgląd pokazywał cały park
+## sprzętu, a nie trzy jednostki.
 
 const BattleViewScene := "res://scenes/battle.tscn"
+const UnitsData = preload("res://scripts/logic/units_data.gd")
+const GameTextures = preload("res://scripts/logic/game_textures.gd")
 
 var output_path: String = "/tmp/art/units.json"
 
@@ -35,36 +39,53 @@ func _initialize() -> void:
 	await process_frame
 
 	# Sprzęt jak w widoku bitwy: tekstury i barwy stron.
-	var uniform: Texture2D = load("res://scripts/logic/game_textures.gd").unit("uniform")
-	var armor: Texture2D = load("res://scripts/logic/game_textures.gd").unit("armor")
-	var track: Texture2D = load("res://scripts/logic/game_textures.gd").unit("track")
-	known_textures = {"uniform": uniform, "armor": armor, "track": track}
-	var sides: Array = [
-		{"name": "gracz", "color": view.COLOR_PLAYER},
-		{"name": "sojusznik", "color": view.COLOR_FRIEND},
-		{"name": "wróg", "color": view.COLOR_ENEMY},
+	var uniform: Texture2D = GameTextures.unit("uniform")
+	var armor: Texture2D = GameTextures.unit("armor")
+	var track: Texture2D = GameTextures.unit("track")
+	known_textures = {
+		"uniform": uniform, "armor": armor, "track": track,
+		"star_us": GameTextures.marking("star_us"), "star_su": GameTextures.marking("star_su"),
+	}
+	# Przedstawiciele parku sprzętu: wszystkie rodziny sylwetek obu stron.
+	var samples: Array = [
+		["Piechota USA (M16A1)", "us_inf_m16"],
+		["Piechota ZSRR (AKM)", "su_inf_ak"],
+		["M113", "us_mech_m113"],
+		["M577", "us_mech_m577"],
+		["BTR-60PB", "su_mech_btr60"],
+		["BMP-1", "su_mech_bmp1"],
+		["MT-LB", "su_mech_mtlb"],
+		["M48A5", "us_arm_m48a5"],
+		["M60A1", "us_arm_m60a1"],
+		["M551 Sheridan", "us_arm_m551"],
+		["T-55", "su_arm_t55"],
+		["T-62", "su_arm_t62"],
+		["T-72 Ural", "su_arm_t72"],
 	]
 
 	var units: Array = []
-	for side in sides:
-		for cls in ["infantry", "mech", "armor"]:
-			var holder: Node3D = Node3D.new()
-			root.add_child(holder)
-			var variant: String = "su" if str(side["name"]) == "wróg" else "us"
-			match cls:
-				"infantry":
-					view._build_infantry(holder, side["color"], uniform)
-				"mech":
-					view._instantiate_parts(holder, view._mech_parts(variant), side["color"], known_textures)
-				_:
-					view._instantiate_parts(holder, view._tank_parts(variant), side["color"], known_textures)
-			units.append({
-				"cls": cls,
-				"side": str(side["name"]),
-				"color": _color_array(side["color"]),
-				"meshes": _dump_node(holder),
-			})
-			holder.free()
+	for sample in samples:
+		var label: String = str(sample[0])
+		var def_id: String = str(sample[1])
+		var cls: String = str(UnitsData.cls_of(def_id))
+		var side: String = "su" if UnitsData.side_of(def_id) == "su" else "us"
+		var holder: Node3D = Node3D.new()
+		root.add_child(holder)
+		if cls == "infantry":
+			view._build_infantry(holder, view._uniform_color(side), uniform)
+		elif cls == "mech":
+			view._instantiate_parts(holder, view._mech_parts(def_id), view._factory_color(side), known_textures)
+		else:
+			view._instantiate_parts(holder, view._armor_parts(def_id), view._factory_color(side), known_textures)
+		units.append({
+			"def_id": def_id,
+			"label": label,
+			"cls": cls,
+			"side": side,
+			"color": _color_array(view._factory_color(side)),
+			"meshes": _dump_node(holder),
+		})
+		holder.free()
 
 	var data: Dictionary = {
 		"note": "Geometria zbudowana przez battle_view.gd (bryły, pozycje, obroty, materiały).",
@@ -93,10 +114,12 @@ func _color_array(color: Color) -> Array:
 	return [color.r, color.g, color.b]
 
 
+## Zrzuca bryły pojazdu; pierścień strony (znacznik interfejsu) pomijamy,
+## bo nie jest częścią sylwetki.
 func _dump_node(node: Node) -> Array:
 	var meshes: Array = []
 	for child in node.get_children():
-		if child is MeshInstance3D:
+		if child is MeshInstance3D and child.name != "side_ring":
 			var entry: Dictionary = _dump_mesh(child)
 			if not entry.is_empty():
 				meshes.append(entry)
@@ -126,6 +149,9 @@ func _dump_mesh(mesh_node: MeshInstance3D) -> Dictionary:
 		entry["prim"] = "sphere"
 		entry["radius"] = mesh.radius
 		entry["height"] = mesh.height
+		entry["radial_segments"] = mesh.radial_segments
+		entry["rings"] = mesh.rings
+		entry["hemisphere"] = mesh.is_hemisphere
 	elif mesh is CapsuleMesh:
 		entry["prim"] = "capsule"
 		entry["radius"] = mesh.radius
