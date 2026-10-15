@@ -9,7 +9,7 @@ const GameState = preload("res://scripts/game_state.gd")
 const UnitsData = preload("res://scripts/logic/units_data.gd")
 const DayNight = preload("res://scripts/logic/daynight.gd")
 const Terrain = preload("res://scripts/logic/terrain.gd")
-const TerrainTextures = preload("res://scripts/logic/terrain_textures.gd")
+const GameTextures = preload("res://scripts/logic/game_textures.gd")
 
 const MOUSE_SENSITIVITY := 0.0015
 const RESULT_DELAY := 1.5
@@ -90,22 +90,32 @@ func _build_world(terrain_kind: String, is_night: bool) -> void:
 	_add_ground(terrain_kind)
 	_add_box(Vector3(0.6, 0.12, BattleSim.FIELD_H), Color(0.95, 0.95, 0.95, 0.85), Vector3(40.0, 0.06, BattleSim.FIELD_H * 0.5))
 
+	# Tekstury otoczenia (gdy któregoś brakuje, wracamy do płaskiego koloru).
+	var bark: Texture2D = GameTextures.prop("tree_bark")
+	var canopy: Texture2D = GameTextures.prop("tree_canopy")
+	var rock: Texture2D = GameTextures.prop("rock")
+	var wall: Texture2D = GameTextures.prop("wall")
+	var roof: Texture2D = GameTextures.prop("roof")
+	var uv_env := Vector3(2.0, 2.0, 1.0)
+
 	for obstacle in sim.obstacles:
 		var pos := Vector3(float(obstacle["x"]), 0.0, float(obstacle["z"]))
 		var radius: float = float(obstacle["r"])
 		if terrain_kind == "forest":
-			_add_cylinder(radius * 0.35, radius * 0.35, 4.0, COLOR_TRUNK, pos + Vector3(0, 2.0, 0))
-			_add_sphere(radius, COLOR_CANOPY, pos + Vector3(0, 4.0, 0))
+			_add_cylinder(radius * 0.35, radius * 0.35, 4.0, COLOR_TRUNK, pos + Vector3(0, 2.0, 0), bark, uv_env)
+			_add_sphere(radius, COLOR_CANOPY, pos + Vector3(0, 4.0, 0), canopy, uv_env)
 		elif terrain_kind == "hills":
-			_add_sphere(radius, COLOR_ROCK, pos + Vector3(0, radius * 0.4, 0))
+			_add_sphere(radius, COLOR_ROCK, pos + Vector3(0, radius * 0.4, 0), rock, uv_env)
 		else:
-			_add_box(Vector3(radius, 1.2, radius), COLOR_ROCK, pos + Vector3(0, 0.6, 0))
+			_add_box(Vector3(radius, 1.2, radius), COLOR_ROCK, pos + Vector3(0, 0.6, 0), rock, uv_env)
 
 	if terrain_kind == "city":
+		var roof_color := Color(0.38, 0.38, 0.39)
 		for i in range(6):
 			var x: float = 430.0 + float(i % 3) * 22.0
 			var z: float = 160.0 + float(i / 3) * 40.0
-			_add_box(Vector3(14.0, 9.0, 14.0), Color(0.62, 0.58, 0.52), Vector3(x, 4.5, z))
+			_add_box(Vector3(14.0, 9.0, 14.0), Color(0.62, 0.58, 0.52), Vector3(x, 4.5, z), wall, Vector3(2.0, 1.0, 1.0))
+			_add_box(Vector3(14.4, 0.4, 14.4), roof_color, Vector3(x, 9.2, z), roof, uv_env)
 
 	camera = Camera3D.new()
 	camera.current = true
@@ -119,7 +129,7 @@ func _add_ground(terrain_kind: String) -> void:
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
 	var kind: int = _terrain_kind_of(terrain_kind)
-	var texture: Texture2D = TerrainTextures.master(kind)
+	var texture: Texture2D = GameTextures.master(kind)
 	if texture != null:
 		var material := StandardMaterial3D.new()
 		material.albedo_texture = texture
@@ -163,37 +173,48 @@ func _material(color: Color) -> StandardMaterial3D:
 	return material
 
 
-func _add_box(size: Vector3, color: Color, pos: Vector3) -> MeshInstance3D:
+## Materiał z teksturą (albo płaski kolor, gdy tekstury brak).
+func _material_for(texture: Texture2D, fallback: Color, uv_scale: Vector3 = Vector3.ONE) -> StandardMaterial3D:
+	if texture == null:
+		return _material(fallback)
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = texture
+	material.uv1_scale = uv_scale
+	material.roughness = 0.95
+	return material
+
+
+func _add_box(size: Vector3, color: Color, pos: Vector3, texture: Texture2D = null, uv_scale: Vector3 = Vector3.ONE) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
-	node.material_override = _material(color)
+	node.material_override = _material_for(texture, color, uv_scale)
 	node.position = pos
 	add_child(node)
 	return node
 
 
-func _add_cylinder(top: float, bottom: float, height: float, color: Color, pos: Vector3) -> MeshInstance3D:
+func _add_cylinder(top: float, bottom: float, height: float, color: Color, pos: Vector3, texture: Texture2D = null, uv_scale: Vector3 = Vector3.ONE) -> MeshInstance3D:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = top
 	mesh.bottom_radius = bottom
 	mesh.height = height
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
-	node.material_override = _material(color)
+	node.material_override = _material_for(texture, color, uv_scale)
 	node.position = pos
 	add_child(node)
 	return node
 
 
-func _add_sphere(radius: float, color: Color, pos: Vector3) -> MeshInstance3D:
+func _add_sphere(radius: float, color: Color, pos: Vector3, texture: Texture2D = null, uv_scale: Vector3 = Vector3.ONE) -> MeshInstance3D:
 	var mesh := SphereMesh.new()
 	mesh.radius = radius
 	mesh.height = radius * 2.0
 	var node := MeshInstance3D.new()
 	node.mesh = mesh
-	node.material_override = _material(color)
+	node.material_override = _material_for(texture, color, uv_scale)
 	node.position = pos
 	add_child(node)
 	return node

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Podglądy tekstur terenu: arkusz kontaktowy i makieta mapy kampanii.
+"""Podglądy tekstur gry: arkusze kontaktowe i makiety.
 
 Użycie:
-    python3 tools/art/preview_terrain.py [--out /tmp/art/out] [--seed 1]
+    python3 tools/art/preview_textures.py [--out /tmp/art/out] [--seed 1]
 
 Tworzy:
-    arkusz_tekstur.png — wszystkie 13 tekstur z paletą i rozmiarami,
-    mapa_seed<seed>.png — prawdziwą mapę 60×40 z tests/ref_map.json złożoną
-      z nowych kafli, z miastami, polem startowym i legendą.
+    arkusz_tekstur.png     — 13 tekstur terenu z paletą i rozmiarami,
+    mapa_seed<seed>.png    — prawdziwą mapę 60×40 z tests/ref_map.json złożoną
+                             z kafli gry, z miastami, polem startowym i legendą,
+    arkusz_otoczenia.png   — 5 tekstur otoczenia bitwy,
+    makieta_otoczenia.png  — makieta brył (drzewo, skała, blok) z tymi teksturami,
+                             żeby było widać, jak siadają na obiektach 3D.
 
 Dzięki temu widać efekt bez uruchamiania Godota (środowisko bez okna graficznego).
 Wymaga Pillow.
@@ -22,6 +25,20 @@ from PIL import Image, ImageDraw, ImageFont
 PROJECT = pathlib.Path(__file__).resolve().parents[2]
 TERRAIN = PROJECT / "assets" / "textures" / "terrain"
 TILES = TERRAIN / "tiles"
+PROPS = PROJECT / "assets" / "textures" / "props"
+
+# Klucze i kolory otoczenia — jak w tools/art/process_props.py i game_textures.gd.
+PROP_KINDS = [
+    ("tree_bark", "kora pnia", "pnie drzew"),
+    ("tree_canopy", "korona drzewa", "korony drzew"),
+    ("rock", "skała", "skały i głazy"),
+    ("wall", "ściana bloku", "bloki miejskie"),
+    ("roof", "dach", "dachy bloków"),
+]
+PROP_PALETTE = {
+    "tree_bark": (87, 69, 51), "tree_canopy": (38, 64, 36), "rock": (122, 120, 115),
+    "wall": (148, 145, 138), "roof": (97, 97, 99),
+}
 
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -58,6 +75,109 @@ def load(key, size=None):
         return None
     img = Image.open(path).convert("RGB")
     return img.resize((size, size), Image.LANCZOS) if size else img
+
+
+def load_prop(key, size=None):
+    path = PROPS / f"{key}.png"
+    if not path.exists():
+        return None
+    img = Image.open(path).convert("RGB")
+    return img.resize((size, size), Image.LANCZOS) if size else img
+
+
+def props_sheet(out_dir):
+    """Arkusz kontaktowy tekstur otoczenia bitwy (256×256)."""
+    cell, pad, label_h, cols, head = 300, 18, 54, 3, 120
+    rows = (len(PROP_KINDS) + cols - 1) // cols
+    sheet = Image.new("RGB", (pad + cols * (cell + pad), head + pad + rows * (cell + label_h + pad)), BG)
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad + 4, 26), "Zimna Wojna 1975 — otoczenie bitwy (AI)", font=ImageFont.truetype(FONT_BOLD, 36), fill=FG)
+    draw.text((pad + 6, 78), "hand-painted surface texture · 256×256 · materiały brył 3D "
+                             "(drzewa, skały, budynki)", font=ImageFont.truetype(FONT, 19), fill=DIM)
+
+    for index, (key, name, usage) in enumerate(PROP_KINDS):
+        x = pad + (index % cols) * (cell + pad)
+        y = head + pad + (index // cols) * (cell + label_h + pad)
+        texture = load_prop(key, cell)
+        if texture is None:
+            draw.rectangle([x, y, x + cell, y + cell], fill=PROP_PALETTE[key])
+            draw.text((x + 14, y + 14), "BRAK — do wygenerowania", font=ImageFont.truetype(FONT, 19), fill=(30, 30, 30))
+        else:
+            sheet.paste(texture, (x, y))
+        draw.rectangle([x, y, x + cell - 1, y + cell - 1], outline=(70, 74, 80))
+        draw.text((x + 2, y + cell + 8), f"{name}  ·  {key}", font=ImageFont.truetype(FONT_BOLD, 25), fill=FG)
+        rgb = PROP_PALETTE[key]
+        draw.text((x + 2, y + cell + 34),
+                  f"#{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X} · {usage} · "
+                  f"{'256 px' if texture else 'brak'}", font=ImageFont.truetype(FONT, 18), fill=DIM)
+
+    path = out_dir / "arkusz_otoczenia.png"
+    sheet.save(path, "PNG")
+    print(f"arkusz otoczenia: {path} ({path.stat().st_size // 1024} kB, {sheet.width}×{sheet.height})")
+
+
+def _textured_ellipse(canvas, box, texture, size_hint=120):
+    mask = Image.new("L", (box[2] - box[0], box[3] - box[1]), 0)
+    ImageDraw.Draw(mask).ellipse([0, 0, mask.width - 1, mask.height - 1], fill=255)
+    canvas.paste(load_prop(texture, size_hint).resize((mask.width, mask.height), Image.LANCZOS),
+                 (box[0], box[1]), mask)
+
+
+def _textured_rect(canvas, box, texture, rounded=True):
+    mask = Image.new("L", (box[2] - box[0], box[3] - box[1]), 0)
+    pen = ImageDraw.Draw(mask)
+    if rounded:
+        pen.rounded_rectangle([0, 0, mask.width - 1, mask.height - 1], radius=min(6, mask.height // 4), fill=255)
+    else:
+        pen.rectangle([0, 0, mask.width - 1, mask.height - 1], fill=255)
+    canvas.paste(load_prop(texture, 160).resize((mask.width, mask.height), Image.LANCZOS),
+                 (box[0], box[1]), mask)
+
+
+def props_mock(out_dir):
+    """Makieta: te same tekstury na bryłach, które buduje battle_view.gd."""
+    w, h, head = 1000, 520, 110
+    canvas = Image.new("RGB", (w, h), BG)
+    draw = ImageDraw.Draw(canvas)
+    draw.text((22, 22), "Makieta otoczenia bitwy — tekstury na bryłach z battle_view.gd",
+              font=ImageFont.truetype(FONT_BOLD, 30), fill=FG)
+    draw.text((24, 64), "drzewo: walec (kora) + kula (korona) · skała: kula (skała) · "
+                        "blok: prostopadłościan (ściana) + płaski dach",
+              font=ImageFont.truetype(FONT, 18), fill=DIM)
+
+    scene_y = head + 30
+    ground = load("plains", 64)
+    if ground is not None:
+        for gy in range(scene_y, h, 64):
+            for gx in range(0, w, 64):
+                canvas.paste(ground, (gx, gy))
+
+    # drzewa: pień + korona
+    for tx, scale in ((120, 1.0), (330, 0.8), (250, 1.25)):
+        trunk_h = int(150 * scale)
+        trunk_w = int(18 * scale)
+        _textured_rect(canvas, (tx, scene_y + 200 - trunk_h, tx + trunk_w, scene_y + 210), "tree_bark")
+        _textured_ellipse(canvas, (tx - int(52 * scale), scene_y + 200 - trunk_h - int(46 * scale),
+                                   tx + trunk_w + int(52 * scale), scene_y + 200 - trunk_h + int(52 * scale)),
+                          "tree_canopy")
+
+    # skała i głaz
+    _textured_ellipse(canvas, (560, scene_y + 130, 720, scene_y + 230), "rock")
+    _textured_ellipse(canvas, (700, scene_y + 170, 790, scene_y + 232), "rock", 90)
+
+    # blok miejski: ściana + dach
+    _textured_rect(canvas, (812, scene_y + 30, 960, scene_y + 210), "wall", rounded=False)
+    _textured_rect(canvas, (806, scene_y + 18, 966, scene_y + 34), "roof", rounded=False)
+
+    draw.rectangle([0, scene_y - 1, w - 1, scene_y], fill=(60, 64, 70))
+    for cx, label in ((60, "drzewo (las)"), (560, "skały (wzgórza)"), (806, "blok (miasto)"),
+                      (0, "")):
+        if label:
+            draw.text((cx, h - 34), label, font=ImageFont.truetype(FONT_BOLD, 20), fill=FG)
+
+    path = out_dir / "makieta_otoczenia.png"
+    canvas.save(path, "PNG")
+    print(f"makieta otoczenia: {path} ({path.stat().st_size // 1024} kB, {canvas.width}×{canvas.height})")
 
 
 def contact_sheet(out_dir):
@@ -171,6 +291,8 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     contact_sheet(out_dir)
     campaign_map_preview(out_dir, args.seed)
+    props_sheet(out_dir)
+    props_mock(out_dir)
 
 
 if __name__ == "__main__":

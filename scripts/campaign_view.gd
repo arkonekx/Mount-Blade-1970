@@ -11,7 +11,7 @@ const Pathfind = preload("res://scripts/logic/pathfind.gd")
 const Fog = preload("res://scripts/logic/fog.gd")
 const UnitsData = preload("res://scripts/logic/units_data.gd")
 const GameState = preload("res://scripts/game_state.gd")
-const TerrainTextures = preload("res://scripts/logic/terrain_textures.gd")
+const GameTextures = preload("res://scripts/logic/game_textures.gd")
 
 const TILE := 16.0
 const MAP_ORIGIN := Vector2(14.0, 48.0)
@@ -255,7 +255,7 @@ func _draw() -> void:
 				color = color.darkened(0.45)
 				tint = Color(0.55, 0.55, 0.55)
 			var rect := Rect2(MAP_ORIGIN + Vector2(x, y) * TILE, Vector2(TILE, TILE))
-			var texture: Texture2D = TerrainTextures.tile(kind)
+			var texture: Texture2D = GameTextures.tile(kind)
 			if texture != null:
 				draw_texture_rect(texture, rect, false, tint)
 			else:

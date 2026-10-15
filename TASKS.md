@@ -64,7 +64,15 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - [x] `tools/art/process_terrain.py` i `tools/art/preview_terrain.py` +
       `assets/textures/terrain/README.md` (paleta, prompty, odtwarzanie)
 - [x] `tests/test_terrain_textures.gd` — 13 kafli 16×16 i 13 materiałów 512×512
-- [ ] tekstury jednostek, pojazdów i budynków w bitwie
+- [x] 5 tekstur otoczenia bitwy (256×256): kora pnia, korona drzewa, skała,
+      ściana bloku i dach — drzewa, skały i budynki w bitwie mają materiały
+      z teksturami (a nie płaskie kolory), z powrotem do kolorów przy braku pliku
+- [x] wspólny rdzeń pipeline'u `tools/art/pipeline.py` (teren i otoczenie robią
+      identyczne dopasowanie kolorystyki); refaktor sprawdzony bajt w bajt —
+      skrót wszystkich plików terenu identyczny przed i po
+- [x] `scripts/logic/game_textures.gd` obsługuje teren i otoczenie,
+      `tests/test_textures.gd` pilnuje obu zestawów
+- [ ] tekstury samych jednostek i pojazdów (żołnierze, czołgi, transportery)
 - [ ] ikony interfejsu (HUD kampanii i bitwy)
 
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
@@ -91,8 +99,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 1. **Do potwierdzenia przez użytkownika**
    - Dowódca to osobny piechur, nie gracz — tak jest zaimplementowane.
    - Śmierć gracza kończy bitwę porażką, nawet gdy sojusznicy żyją — tak jest zaimplementowane.
-2. **Tekstury jednostek i ikon (AI)** — teren gotowy (etap 7); do zrobienia
-   pozostają żołnierze, pojazdy, budynki i ikony HUD.
+2. **Tekstury jednostek i ikon (AI)** — teren i otoczenie bitwy gotowe (etap 7);
+   do zrobienia pozostają żołnierze, pojazdy i ikony HUD.
 3. **Dźwięk** — do przeniesienia z wersji TypeScript (nie ma go w tym repo).
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.
