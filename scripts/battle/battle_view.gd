@@ -8,6 +8,8 @@ const BattleSim = preload("res://scripts/battle/battle_sim.gd")
 const GameState = preload("res://scripts/game_state.gd")
 const UnitsData = preload("res://scripts/logic/units_data.gd")
 const DayNight = preload("res://scripts/logic/daynight.gd")
+const Terrain = preload("res://scripts/logic/terrain.gd")
+const TerrainTextures = preload("res://scripts/logic/terrain_textures.gd")
 
 const MOUSE_SENSITIVITY := 0.0015
 const RESULT_DELAY := 1.5
@@ -85,7 +87,7 @@ func _build_world(terrain_kind: String, is_night: bool) -> void:
 	add_child(sun)
 
 	# Grunt + linia odwrotu
-	_add_box(Vector3(BattleSim.FIELD_W, 1.0, BattleSim.FIELD_H), _ground_color(terrain_kind), Vector3(BattleSim.FIELD_W * 0.5, -0.5, BattleSim.FIELD_H * 0.5))
+	_add_ground(terrain_kind)
 	_add_box(Vector3(0.6, 0.12, BattleSim.FIELD_H), Color(0.95, 0.95, 0.95, 0.85), Vector3(40.0, 0.06, BattleSim.FIELD_H * 0.5))
 
 	for obstacle in sim.obstacles:
@@ -108,6 +110,39 @@ func _build_world(terrain_kind: String, is_night: bool) -> void:
 	camera = Camera3D.new()
 	camera.current = true
 	add_child(camera)
+
+
+## Grunt bitwy: pole 1000 × 400 m z teksturą terenu rozłożoną co ~50 m.
+func _add_ground(terrain_kind: String) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(BattleSim.FIELD_W, 1.0, BattleSim.FIELD_H)
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	var kind: int = _terrain_kind_of(terrain_kind)
+	var texture: Texture2D = TerrainTextures.master(kind)
+	if texture != null:
+		var material := StandardMaterial3D.new()
+		material.albedo_texture = texture
+		material.uv1_scale = Vector3(BattleSim.FIELD_W / 50.0, BattleSim.FIELD_H / 50.0, 1.0)
+		material.roughness = 0.95
+		node.material_override = material
+	else:
+		node.material_override = _material(_ground_color(terrain_kind))
+	node.position = Vector3(BattleSim.FIELD_W * 0.5, -0.5, BattleSim.FIELD_H * 0.5)
+	add_child(node)
+
+
+## Nazwa terenu z GameState („las”, „wzgórza”, …) → Terrain.Kind.
+func _terrain_kind_of(terrain_kind: String) -> int:
+	match terrain_kind:
+		"forest":
+			return Terrain.Kind.FOREST
+		"hills":
+			return Terrain.Kind.HILLS
+		"city":
+			return Terrain.Kind.CITY
+		_:
+			return Terrain.Kind.PLAINS
 
 
 func _ground_color(terrain_kind: String) -> Color:

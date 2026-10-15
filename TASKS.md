@@ -51,6 +51,22 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
       kamera pierwszej osoby, HUD, pauza, powrót do kampanii
 - [x] `tests/test_battle.gd`
 
+### Etap 7 — grafika AI (teren)
+- [x] 13 tekstur terenu (stylizowana mapa sztabowa z lotu ptaka) w dwóch rozmiarach:
+      512×512 na materiały 3D i 16×16 na kafle mapy — `assets/textures/terrain/`
+- [x] kolor każdej tekstury sprowadzony programowo do palety z `campaign_view.gd`
+      (korekta średniej + przemalowanie w palecie), więc 13 osobnych obrazów
+      czyta się jak jedna mapa
+- [x] `scripts/logic/terrain_textures.gd` — loader bez importu zasobów
+      (`Image.load_from_file`), z powrotem do kolorów, gdy pliku brak
+- [x] kafle wpięte w mapę kampanii (mgła przygasza je tak samo jak kolory),
+      tekstura gruntu wpięta w bitwę 3D (1000×400 m, powtarzana co ~50 m)
+- [x] `tools/art/process_terrain.py` i `tools/art/preview_terrain.py` +
+      `assets/textures/terrain/README.md` (paleta, prompty, odtwarzanie)
+- [x] `tests/test_terrain_textures.gd` — 13 kafli 16×16 i 13 materiałów 512×512
+- [ ] tekstury jednostek, pojazdów i budynków w bitwie
+- [ ] ikony interfejsu (HUD kampanii i bitwy)
+
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
 
 - `map_gen.gd`: `static func _get/_set` kolidowały z wirtualnymi metodami `Object`
@@ -75,8 +91,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 1. **Do potwierdzenia przez użytkownika**
    - Dowódca to osobny piechur, nie gracz — tak jest zaimplementowane.
    - Śmierć gracza kończy bitwę porażką, nawet gdy sojusznicy żyją — tak jest zaimplementowane.
-2. **Tekstury i ikony (AI)** — obecnie wyłącznie prymitywy i kolory. Grafika ma
-   być generowana AI w stylu stylizowanym; czeka na zgodę użytkownika.
+2. **Tekstury jednostek i ikon (AI)** — teren gotowy (etap 7); do zrobienia
+   pozostają żołnierze, pojazdy, budynki i ikony HUD.
 3. **Dźwięk** — do przeniesienia z wersji TypeScript (nie ma go w tym repo).
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.
@@ -98,6 +114,7 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - Wszystkie testy i obie sceny zostały faktycznie uruchomione na tej binarke:
   pięć testów logiki = PASS, sceny `campaign` i `battle` startują bez błędów
   skryptów (`--quit-after 300`).
+- Liczba testów wzrosła do siedmiu (`test_terrain_textures` pilnuje kompletu tekstur).
 - Analiza statyczna całego projektu (`@gdscript-analyzer/core` 0.6.1):
   **0 błędów, 0 ostrzeżeń** (pole `seed` w `campaign.gd` zmienione na
   `world_seed`, żeby nie przesłaniało globalnej funkcji `seed()`; klucz w pliku

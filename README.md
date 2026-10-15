@@ -87,6 +87,27 @@ W edytorze Godota: otwórz `project.godot` i uruchom projekt (F5).
 * Bitwa kończy się po 600 sekundach (bez rozstrzygnięcia) albo wcześniej:
   śmierć gracza = porażka, wybicie wszystkich wrogów = zwycięstwo, odwrót = `retreat`.
 
+## Grafika
+
+Materiały są generowane AI (stylizowana, malowana mapa sztabowa z lotu ptaka)
+i sprowadzane do jednej palety programowo, więc mapa nie wygląda jak kolaż.
+
+```
+assets/textures/terrain/<klucz>.png        512×512  — materiały 3D (grunt bitwy)
+assets/textures/terrain/tiles/<klucz>.png   16×16   — kafle mapy kampanii
+scripts/logic/terrain_textures.gd           loader tekstur (z zapasem na kolory)
+tools/art/process_terrain.py                surowy obraz AI → kafel gry
+tools/art/preview_terrain.py                arkusz kontaktowy + makieta mapy
+assets/textures/terrain/README.md           paleta, prompty, instrukcja
+```
+
+Tekstury są wczytywane przez `Image.load_from_file` (a nie `load("res://…")`),
+bo projekt bywa uruchamiany bez otwartego edytora (`--headless` w testach),
+a wtedy Godot nie ma jeszcze zaimportowanych zasobów. Gdyby jakiejś tekstury
+brakowało, mapa wraca do płaskich kolorów z `COLORS` — gra się nie wywala.
+Przy eksporcie dodaj `assets/textures/terrain/*.png` do filtra plików
+niezasobowych w presecie eksportu.
+
 ## Testy
 
 ```bash
@@ -104,6 +125,8 @@ sceny, a na końcu wypisuje `RESULT: PASS` albo `RESULT: FAIL`.
 * `test_save` — zapis i odczyt stanu kampanii.
 * `test_playthrough` — cała rozgrywka bez okna: bot maszeruje do celów, rozgrywa
   bitwy prawdziwym symulatorem, rozlicza je i w trakcie kampanii robi zapis/odczyt.
+* `test_terrain_textures` — wszystkie 13 kafli i materiałów ma właściwy rozmiar
+  (16×16 i 512×512), nic nie wypadło z palety ani z nazw plików.
 
 Pojedynczy test:
 
@@ -136,14 +159,18 @@ scripts/logic/daynight.gd  doba, widoczność i przygaszenie nocą
 scripts/logic/ferry.gd     łodzie przy brzegu i budowa mostu
 scripts/logic/enemy.gd     oddziały wroga: cele, trasy, ruch
 scripts/logic/campaign.gd  kampania: czas, ekonomia, cele, zwiad, zapis
+scripts/logic/terrain_textures.gd  ładowanie tekstur terenu (bez importu)
+assets/textures/terrain/   tekstury terenu 512×512 + kafle mapy 16×16 (grafika AI)
+tools/art/                 pipeline tekstur: przetwarzanie i podglądy
 tests/                     testy logiki + wzorzec map
 tests/test_playthrough.gd  pełna rozgrywka bez okna (bot + bitwy + zapis)
+tests/test_terrain_textures.gd  kompletność i rozmiary tekstur
 ```
 
 ## Czego jeszcze nie ma
 
-* Tekstur i ikon — obecnie wyłącznie prymitywy i kolory (grafika ma powstać
-  jako materiał generowany AI, w stylu stylizowanym).
+* Tekstur jednostek, budynków i ikon interfejsu — teren ma już grafika AI,
+  ale żołnierze, pojazdy i HUD to nadal prymitywy i płaskie kolory.
 * Dźwięku (do przeniesienia z wersji TypeScript projektu).
 * Eksportu web (wymaga szablonów eksportu Godota 4.7).
 * Strojenia balansu — wartości startowe nie były jeszcze grane „na żywo”.

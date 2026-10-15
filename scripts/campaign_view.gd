@@ -11,6 +11,7 @@ const Pathfind = preload("res://scripts/logic/pathfind.gd")
 const Fog = preload("res://scripts/logic/fog.gd")
 const UnitsData = preload("res://scripts/logic/units_data.gd")
 const GameState = preload("res://scripts/game_state.gd")
+const TerrainTextures = preload("res://scripts/logic/terrain_textures.gd")
 
 const TILE := 16.0
 const MAP_ORIGIN := Vector2(14.0, 48.0)
@@ -247,10 +248,18 @@ func _draw() -> void:
 			var state: int = campaign.fog.get_state(x, y)
 			if state == Fog.UNKNOWN:
 				continue
+			# Kafel terenu, a gdy tekstury brak — zapasowy kolor z COLORS.
+			# Mgła przygasza kafel tak samo, jak wcześniej przygaszała kolor.
+			var tint := Color(1, 1, 1)
 			if state == Fog.EXPLORED:
 				color = color.darkened(0.45)
+				tint = Color(0.55, 0.55, 0.55)
 			var rect := Rect2(MAP_ORIGIN + Vector2(x, y) * TILE, Vector2(TILE, TILE))
-			draw_rect(rect, color)
+			var texture: Texture2D = TerrainTextures.tile(kind)
+			if texture != null:
+				draw_texture_rect(texture, rect, false, tint)
+			else:
+				draw_rect(rect, color)
 
 	_draw_cities()
 	_draw_objectives()
