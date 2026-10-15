@@ -4,27 +4,73 @@ Obrazki poglądowe generowane narzędziami z `tools/` — do oglądania bez
 uruchamiania gry (środowisko robocze nie ma serwera graficznego, więc Godot
 w `--headless` nie renderuje obrazu).
 
-| plik | co pokazuje | jak powstał |
-| --- | --- | --- |
-| `czolg_z_gry.jpg` | czołg z gry w czterech ujęciach (3/4, z boku, z przodu, z góry), wóz bojowy i piechur w skali, oraz ta sama geometria w trzech barwach stron | `tools/godot/dump_meshes.gd` + `tools/art/render_units.py` |
-| `czolg_barwy_stron.jpg` | czołg w barwach gracza, sojusznika i wroga — ta sama tekstura, inny `albedo_color` | `tools/art/render_units.py` |
-| `jednostki_skala.jpg` | czołg (16 brył), wóz bojowy (13) i piechur (2) w jednej skali | `tools/art/render_units.py` |
-| `arkusz_tekstur_terenu.jpg` | 13 tekstur terenu z paletą: równina, las, wzgórza, góry, bagno, rzeka, bród, jezioro, miasto, droga, most, piasek, śnieg | `tools/art/preview_textures.py` |
-| `arkusz_otoczenia.jpg` | 5 tekstur otoczenia bitwy: kora, korona, skała, ściana bloku, dach | `tools/art/preview_textures.py` |
-| `arkusz_jednostek.jpg` | tekstury sprzętu bez barwy i w trzech barwach stron | `tools/art/preview_textures.py` |
-| `arkusz_ikon.jpg` | 6 ikon mapy w rozmiarze docelowym i w skali mapy (24 i 16 px) | `tools/art/preview_textures.py` |
-| `mapa_kampanii_seed1.jpg` | makieta mapy 60×40 z prawdziwego `tests/ref_map.json`, złożona z kafli gry, z ikonami | `tools/art/preview_textures.py` |
-| `makieta_otoczenia.jpg` | tekstury otoczenia na bryłach, które buduje `battle_view.gd` | `tools/art/preview_textures.py` |
-| `makieta_pojazdow.jpg` | schemat brył pojazdów w skali 1:20 z podziałem na części | `tools/art/preview_textures.py` |
+---
 
-## Wierność
+## Czołg z gry — 16 brył
 
-* **Arkusz tekstur, ikon i otoczenia** — to wprost pliki z `assets/`, więc 1:1 z grą.
-* **Makieta mapy** — prawdziwe dane mapy (`tests/ref_map.json`) i prawdziwe kafle;
-  wrogowie i zwiadowca to znaczniki przykładowe (rozgrywka jest losowa).
-* **Rendery jednostek** — bryły, rozmiary, pozycje, barwy i tekstury 1:1 z gry;
-  oświetlenie i rzut są przybliżeniem mojego renderera (Godot inaczej tonuje
-  obraz). Szczegóły: `tools/godot/README.md`.
+Geometria i tekstury pochodzą **z gry**: zrzut robi skrypt, który woła te same
+funkcje budujące świat bitwy co `battle_view.gd`. Cztery ujęcia, a pod nimi
+wóz bojowy i piechur w tej samej skali oraz ta sama geometria w barwach stron.
+
+![Czołg z gry w czterech ujęciach](czolg_z_gry.jpg)
+
+## Ta sama tekstura, trzy barwy stron
+
+W grze kolor strony jest mnożony przez teksturę sprzętu, więc detal (nity,
+spoiny, ogniwa) zostaje, a przynależność widać od razu.
+
+![Czołg w barwach gracza, sojusznika i wroga](czolg_barwy_stron.jpg)
+
+## Jednostki w jednej skali
+
+![Czołg, wóz bojowy i piechur w jednej skali](jednostki_skala.jpg)
+
+---
+
+## Tekstury terenu (13)
+
+Sprowadzone programowo do jednej palety, więc mapa nie wygląda jak kolaż.
+
+![Arkusz tekstur terenu](arkusz_tekstur_terenu.jpg)
+
+## Tekstury otoczenia bitwy (5)
+
+![Arkusz tekstur otoczenia](arkusz_otoczenia.jpg)
+
+## Tekstury sprzętu (2)
+
+![Arkusz tekstur sprzętu](arkusz_jednostek.jpg)
+
+## Ikony mapy (6)
+
+![Arkusz ikon](arkusz_ikon.jpg)
+
+---
+
+## Makiety
+
+Mapa kampanii 60×40 z prawdziwego `tests/ref_map.json`, złożona z kafli gry,
+z ikonami (wrogowie i zwiadowca to znaczniki przykładowe — rozgrywka jest losowa):
+
+![Makieta mapy kampanii](mapa_kampanii_seed1.jpg)
+
+Tekstury otoczenia na bryłach, które buduje `battle_view.gd`:
+
+![Makieta otoczenia](makieta_otoczenia.jpg)
+
+Schemat brył pojazdów w skali 1:20:
+
+![Makieta pojazdów](makieta_pojazdow.jpg)
+
+---
+
+## Co jest 1:1 z grą, a co przybliżeniem
+
+| plik | wierność |
+| --- | --- |
+| arkusze tekstur, ikon i otoczenia | **1:1** — to wprost pliki z `assets/` |
+| `mapa_kampanii_seed1` | **dane i kafle 1:1** — prawdziwy seed z `tests/ref_map.json`; wrogowie i zwiadowca to znaczniki przykładowe |
+| `czolg_z_gry`, `czolg_barwy_stron`, `jednostki_skala` | **geometria, barwy i tekstury 1:1** z gry; oświetlenie i rzut to przybliżenie renderera (Godot inaczej tonuje obraz) — szczegóły w `tools/godot/README.md` |
 
 ## Odtworzenie
 
