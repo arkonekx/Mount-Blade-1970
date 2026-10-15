@@ -135,6 +135,12 @@ brakowało, mapa wraca do płaskich kolorów z `COLORS` — gra się nie wywala.
 Przy eksporcie dodaj `assets/textures/terrain/*.png` do filtra plików
 niezasobowych w presecie eksportu.
 
+## Podglądy
+
+Obrazki poglądowe (czołg z gry, arkusze tekstur, makieta mapy) leżą w
+`docs/podglady/` — spis i informacja, co jest 1:1 z grą, a co przybliżeniem:
+`docs/podglady/README.md`.
+
 ## Podgląd bez okna graficznego
 
 Środowisko bez serwera graficznego nie pozwala zrobić zrzutu ekranu z gry
