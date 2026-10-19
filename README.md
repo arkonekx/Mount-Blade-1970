@@ -9,9 +9,18 @@ osobie, pieszo albo z pokładu pojazdu.
 ## Wymagania
 
 * Godot **4.7.x** (projekt tworzony i przetestowany na 4.7.2) — dowolna binarka
-  z tej linii. W środowisku, w którym projekt powstał, leży zbudowana ze źródeł
-  i spakowana binarka: `/home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64.gz`
-  (rozpakowanie: `gunzip -k …`).
+  z tej linii. **Binarka testowa jest w repo**: spakowana
+  `tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64.gz` (35 MB, po rozpakowaniu
+  136 MB; szczegóły i suma kontrolna w `tools/godot/bin/README.md`). To
+  kompilacja headless — bez X11, Waylanda i dźwięku: wystarcza do testów
+  i scen w `--headless`, ale **nie do gry z okienkiem**; do grania weź oficjalne
+  wydanie z godotengine.org.
+
+  ```bash
+  gunzip -k tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64.gz
+  export GODOT="$PWD/tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64"
+  ./run_tests.sh        # 7 testów + 2 sceny
+  ```
 * Nic więcej — cała grafika to prymitywy 3D i kolory, dźwięk nie jest jeszcze
   podłączony.
 

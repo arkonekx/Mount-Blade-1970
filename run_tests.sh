@@ -14,8 +14,9 @@ cd "$(dirname "$0")" || exit 1
 
 if [ ! -x "$GODOT" ] && ! command -v "$GODOT" >/dev/null 2>&1; then
 	echo "Nie znaleziono binarki Godot: $GODOT"
-	echo "Ustaw zmienną GODOT, np. GODOT=/home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64 ./run_tests.sh"
-	echo "(binarka jest spakowana: gunzip -k /home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64.gz)"
+	echo "Binarka Godota jest w repo, spakowana:"
+	echo "  gunzip -k tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64.gz"
+	echo "  GODOT=\$PWD/tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64 ./run_tests.sh"
 	exit 1
 fi
 

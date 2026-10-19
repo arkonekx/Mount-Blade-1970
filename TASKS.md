@@ -192,9 +192,10 @@ wypadają **M48A5** i **M577**.
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.
 6. **Przegląd wizualny** — widoki 2D i 3D sprawdzone tylko bez okna (`--headless`).
-7. **Rozmiar workspace** — binarka Godota (~136 MB) leży poza projektem,
-   spakowana do ~37 MB w `/home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64.gz`.
-   Do repo nie trafia; przed użyciem: `gunzip -k` (patrz README).
+7. **Binarka Godota** — spakowana (35 MB) leży **w repo**:
+   `tools/godot/bin/Godot_v4.7.2-stable_linux.x86_64.gz`; po rozpakowaniu 136 MB,
+   więc wersja niespakowana nie wchodzi (limit GitHuba: 100 MB). Przed użyciem:
+   `gunzip -k` (patrz `tools/godot/bin/README.md`).
    Budowa ze źródeł wymaga `linkflags="-Wl,--start-group"` (kolejność archiwów
    w linku) i `disable_path_overrides=no` (obsługa `--path` w szablonie).
 
