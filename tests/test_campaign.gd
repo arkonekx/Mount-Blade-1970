@@ -284,7 +284,7 @@ func _test_victory_and_limits() -> void:
 		units.append({"id": i + 1, "def_id": "us_mech_m113", "cls": "mech", "name": "Transporter"})
 	_check(not Army.validate(units).is_empty(), "Przekroczenie limitu zmechanizowanych powinno być błędem")
 	_check(UnitsData.LIMIT_TOTAL == 30 and UnitsData.LIMIT_ARMOR == 2 and UnitsData.LIMIT_MECH == 5, "Limity oddziału muszą pozostać niezmienione")
-	_check(UnitsData.is_prototype("us_proto_xm803"), "XM803 powinien być prototypem")
+	_check(UnitsData.is_prototype("us_proto_mbt70"), "MBT-70 powinien być prototypem")
 	_check(UnitsData.is_prototype("su_proto_775"), "Obiekt 775 powinien być prototypem")
 	for unit in UnitsData.defs_for("us", "armor"):
 		_check(not bool(unit["prototype"]), "Prototypy nie mogą trafiać do losowej rekrutacji")

@@ -47,7 +47,7 @@ func _su_army() -> Array:
 		_unit(101, "su_inf_ak", "infantry", "Piechota (AKM)"),
 		_unit(102, "su_inf_rpg", "infantry", "Drużyna ppanc (RPG-7)"),
 		_unit(103, "su_mech_bmp1", "mech", "BMP-1"),
-		_unit(104, "su_arm_t55", "armor", "T-55"),
+		_unit(104, "su_arm_t62", "armor", "T-62 Obr. 1972"),
 	]
 
 

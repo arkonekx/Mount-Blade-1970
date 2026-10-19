@@ -51,16 +51,15 @@ func _initialize() -> void:
 		["Piechota USA (M16A1)", "us_inf_m16"],
 		["Piechota ZSRR (AKM)", "su_inf_ak"],
 		["M113", "us_mech_m113"],
-		["M577", "us_mech_m577"],
 		["BTR-60PB", "su_mech_btr60"],
 		["BMP-1", "su_mech_bmp1"],
 		["MT-LB", "su_mech_mtlb"],
-		["M48A5", "us_arm_m48a5"],
 		["M60A1", "us_arm_m60a1"],
 		["M551 Sheridan", "us_arm_m551"],
-		["T-55", "su_arm_t55"],
-		["T-62", "su_arm_t62"],
+		["MBT-70", "us_proto_mbt70"],
+		["T-62 Obr. 1972", "su_arm_t62"],
 		["T-72 Ural", "su_arm_t72"],
+		["Obiekt 775", "su_proto_775"],
 	]
 
 	var units: Array = []

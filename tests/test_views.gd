@@ -13,9 +13,8 @@ extends SceneTree
 const UnitsData = preload("res://scripts/logic/units_data.gd")
 
 # Dokładne liczby brył, z których battle_view.gd składa sylwetki
-# (patrz stałe ARMOR_PARTS / MECH_PARTS / INFANTRY_PARTS w battle_view.gd).
-const ARMOR_PARTS := 256
-const MECH_PARTS := 128
+# (patrz stałe VEHICLE_PARTS / INFANTRY_PARTS w battle_view.gd).
+const VEHICLE_PARTS := 1024
 const INFANTRY_PARTS := 10
 
 var failures: Array = []
@@ -67,13 +66,10 @@ func _test_battle_view() -> void:
 			_check(meshes == INFANTRY_PARTS,
 				"Piechur ma %d brył (oczekiwane dokładnie %d: ciało, hełm, plecak, kończyny, broń)"
 				% [meshes, INFANTRY_PARTS])
-		elif cls == UnitsData.CLS_MECH:
-			_check(meshes == MECH_PARTS,
-				"Wóz bojowy ma %d brył (oczekiwane dokładnie %d: kadłub, gąsienice z ogniwami, koła, wieża, lufa)"
-				% [meshes, MECH_PARTS])
 		else:
-			_check(meshes == ARMOR_PARTS,
-				"Czołg ma %d brył (oczekiwane dokładnie %d)" % [meshes, ARMOR_PARTS])
+			_check(meshes == VEHICLE_PARTS,
+				"Pojazd ma %d brył (oczekiwane dokładnie %d: kadłub, podwozie, koła, wieża, lufa)"
+				% [meshes, VEHICLE_PARTS])
 
 	# Materiały: co najmniej część świata musi mieć tekstury AI (nie same kolory).
 	var textured: int = 0
@@ -85,7 +81,7 @@ func _test_battle_view() -> void:
 		if material != null:
 			unique_materials[material.get_instance_id()] = true
 	_check(textured >= 10, "Tylko %d brył ma teksturę AI — tekstury chyba się nie wczytały" % textured)
-	# Sylwetki mają po 128–256 brył; gdyby każda dostawała własny materiał,
+	# Sylwetki mają po 1024 bryły; gdyby każda dostawała własny materiał,
 	# w bitwie powstałyby tysiące identycznych materiałów. Cache musi działać.
 	_check(unique_materials.size() <= 64,
 		"Materiały nie są dzielone: %d unikalnych materiałów w scenie bitwy" % unique_materials.size())
@@ -101,7 +97,7 @@ func _test_shapes(view) -> void:
 	# Każda rodzina wozów ma inny kształt, więc mierzymy je i porównujemy:
 	# dwie sylwetki o tej samej długości, wysokości i liczbie kół byłyby błędem.
 	var stats: Dictionary = {}
-	for def_id in ["us_arm_m60a1", "us_arm_m551", "su_arm_t55", "su_arm_t72"]:
+	for def_id in ["us_arm_m60a1", "us_arm_m551", "us_proto_mbt70", "su_arm_t62", "su_arm_t72", "su_proto_775"]:
 		stats[def_id] = _shape_stats(view, str(def_id), true)
 	for def_id in ["us_mech_m113", "su_mech_btr60", "su_mech_bmp1", "su_mech_mtlb"]:
 		stats[def_id] = _shape_stats(view, str(def_id), false)
@@ -113,7 +109,7 @@ func _test_shapes(view) -> void:
 		seen[key] = def_id
 		print("  %-14s brył %d · dł. %.1f m · wys. %.1f m · kół i ogniw %d"
 			% [def_id, st["meshes"], st["length"], st["height"], st["wheels"]])
-	# Czołgi obu stron muszą mieć różną wysokość sylwetki (T-55/T-72 są niższe
+	# Czołgi obu stron muszą mieć różną wysokość sylwetki (T-62/T-72 są niższe
 	# od M60), a wozy bojowe — różną liczbę kół (BTR-60 jest ośmiokołowy).
 	_check(float(stats["su_arm_t72"]["height"]) < float(stats["us_arm_m60a1"]["height"]),
 		"T-72 nie jest niższy od M60A1 — sylwetki nie trzymają się prawdziwych proporcji")

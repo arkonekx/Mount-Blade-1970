@@ -294,10 +294,9 @@ func _add_sphere(radius: float, color: Color, pos: Vector3, texture: Texture2D =
 ## noszą barwy fabryczne (amerykański olive drab, radziecka zieleń 4BO), więc
 ## strony rozpoznaje się po sylwetce i oznaczeniu państwowym — tak jak wtedy.
 ##
-## Liczba brył jest stała i pilnuje jej tests/test_views.gd:
-## czołg 256, wóz bojowy 128, piechur 10.
-const ARMOR_PARTS := 256
-const MECH_PARTS := 128
+## Liczba brył jest stała i pilnuje jej tests/test_views.gd: każdy pojazd —
+## czołg, wóz kołowy i ich warianty — ma dokładnie 1024 bryły, piechur 10.
+const VEHICLE_PARTS := 1024
 const INFANTRY_PARTS := 10
 
 ## Barwy fabryczne 1975 roku.
@@ -308,25 +307,23 @@ const UNIFORM_SU := Color(0.49, 0.49, 0.32)
 
 ## Rodzina sylwetki dla identyfikatora jednostki (patrz units_data.gd).
 const ARMOR_SHAPES := {
-	"us_arm_m48a5": "patton",
-	"us_arm_m60a1": "patton",
+	"us_arm_m60a1": "m60a1",
 	"us_arm_m551": "sheridan",
-	"us_proto_xm803": "sheridan",
-	"su_arm_t55": "t54",
-	"su_arm_t62": "t54",
+	"us_proto_mbt70": "mbt70",
+	"su_arm_t62": "t62",
 	"su_arm_t72": "t72",
-	"su_proto_775": "t72",
+	"su_proto_775": "obj775",
 }
 const MECH_SHAPES := {
 	"us_mech_m113": "m113",
-	"us_mech_m113tow": "m113",
-	"us_mech_m577": "m577",
-	"us_eng_cev": "m113",
+	"us_mech_m113tow": "m113tow",
+	"us_eng_cev": "m60cev",
 	"su_mech_btr60": "btr60",
 	"su_mech_bmp1": "bmp1",
 	"su_mech_mtlb": "mtlb",
-	"su_eng_mtu": "mtlb",
+	"su_eng_mtu": "mtu",
 }
+
 
 ## Tony: 0 = barwa fabryczna, większe = ciemniejsze, -1 = ciemny metal.
 const TONE_BODY := 0.0
@@ -595,53 +592,224 @@ func _add_track_links(parts: Array, count: int, z: float, width: float,
 			TONE_TRACK, "track", TRACK_UV, false))
 
 
-## Koło jezdne: opona, felga i piasta.
+## Koło jezdne: opona, felga, piasta i kołpak (cztery bryły).
 func _add_road_wheel(parts: Array, x: float, y: float, z: float, radius: float, width: float) -> void:
 	var rot := Vector3(PI * 0.5, 0.0, 0.0)
 	parts.append(_part_cyl(radius, radius, width, 16, Vector3(x, y, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
-	parts.append(_part_cyl(radius * 0.52, radius * 0.52, width * 1.12, 16, Vector3(x, y, z), rot, TONE_DEEP, "track", PLAIN_UV, false))
-	parts.append(_part_cyl(radius * 0.17, radius * 0.17, width * 1.3, 10, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.62, radius * 0.62, width * 1.08, 16, Vector3(x, y, z), rot, TONE_DEEP, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.30, radius * 0.30, width * 1.18, 12, Vector3(x, y, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.15, radius * 0.15, width * 1.3, 10, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
 
 
-## Podwozie gąsienicowe jednej strony; zwraca liczbę dodanych brył.
+## Pierścień łbów śrub wokół piasty koła.
+func _add_hub_bolts(parts: Array, x: float, y: float, z: float, radius: float, count: int) -> void:
+	for b in range(count):
+		var a: float = TAU * float(b) / float(count)
+		parts.append(_part_box(Vector3(0.08, 0.08, 0.1),
+			Vector3(x + cos(a) * radius, y + sin(a) * radius, z),
+			Vector3(0.0, 0.0, a), TONE_METAL, "", PLAIN_UV, false))
+
+
+## Koło napędowe: bęben, piasta i zęby wokół obwodu.
+func _add_sprocket(parts: Array, x: float, y: float, z: float, radius: float,
+		width: float, teeth: int) -> void:
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	parts.append(_part_cyl(radius * 0.86, radius * 0.86, width * 0.8, 14, Vector3(x, y, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.32, radius * 0.32, width * 0.95, 10, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	for t in range(teeth):
+		var a: float = TAU * float(t) / float(teeth)
+		parts.append(_part_box(Vector3(0.11, 0.09, width * 0.86),
+			Vector3(x + cos(a) * radius, y + sin(a) * radius, z),
+			Vector3(0.0, 0.0, a), TONE_TRACK, "track", PLAIN_UV, false))
+
+
+## Koło napinające: obręcz, piasta i szprychy.
+func _add_idler(parts: Array, x: float, y: float, z: float, radius: float,
+		width: float, spokes: int) -> void:
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	parts.append(_part_cyl(radius, radius, width * 0.72, 14, Vector3(x, y, z), rot, TONE_WHEEL, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.28, radius * 0.28, width * 0.9, 10, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	for t in range(spokes):
+		var a: float = TAU * float(t) / float(spokes)
+		parts.append(_part_box(Vector3(radius * 1.15, 0.09, width * 0.5),
+			Vector3(x, y, z), Vector3(0.0, 0.0, a), TONE_DEEP, "track", PLAIN_UV, false))
+
+
+## Rolka podtrzymująca bieg górny: walec i oś.
+func _add_roller(parts: Array, x: float, y: float, z: float, wheel_w: float) -> void:
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	parts.append(_part_cyl(0.13, 0.13, wheel_w * 0.7, 10, Vector3(x, y, z), rot, TONE_DEEP, "track", PLAIN_UV, false))
+	parts.append(_part_cyl(0.05, 0.05, wheel_w * 1.05, 8, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+
+
+## Podwozie gąsienicowe jednej strony: koła jezdne z wahaczami i śrubami piast,
+## rolki, koło napędowe z zębami i napinające ze szprychami.
 ##
 ## `drive_front` mówi, gdzie stoi koło napędowe: M60 ma je z tyłu, a M551, M113
 ## i BMP-1 z przodu — to jedna z rzeczy, po których poznaje się wóz z daleka.
 ## `rollers` to liczba rolek podtrzymujących (M113 i MT-LB ich nie mają).
 func _add_running_gear(parts: Array, z: float, wheels: int, wheel_r: float, wheel_w: float,
 		span: float, front_x: float, rear_x: float, y_bottom: float, y_top: float,
-		rollers: int, drive_front: bool, sprocket_r: float, idler_r: float) -> int:
-	var added: int = 0
+		rollers: int, drive_front: bool, sprocket_r: float, idler_r: float) -> void:
 	var rot := Vector3(PI * 0.5, 0.0, 0.0)
 	var step: float = 0.0 if wheels <= 1 else span / float(wheels - 1)
 	for w in range(wheels):
-		_add_road_wheel(parts, -span * 0.5 + step * float(w), y_bottom + wheel_r, z, wheel_r, wheel_w)
-		added += 3
+		var x: float = -span * 0.5 + step * float(w)
+		var y: float = y_bottom + wheel_r
+		_add_road_wheel(parts, x, y, z, wheel_r, wheel_w)
+		_add_hub_bolts(parts, x, y, z + wheel_w * 0.62, wheel_r * 0.44, 6)
+		# wahacz zawieszenia w stronę kadłuba
+		parts.append(_part_box(Vector3(0.42, 0.14, 0.3), Vector3(x + 0.16, y + 0.12, z * 0.86),
+			Vector3(0.0, 0.0, 0.35), TONE_DEEP, "armor", PLAIN_UV, false))
 	for r in range(rollers):
 		var t: float = 0.5 if rollers <= 1 else float(r) / float(rollers - 1)
 		var x: float = -span * 0.42 + span * 0.84 * t
-		parts.append(_part_cyl(0.13, 0.13, wheel_w * 0.7, 10, Vector3(x, y_top - 0.10, z), rot,
-			TONE_DEEP, "track", PLAIN_UV, false))
-		added += 1
+		_add_roller(parts, x, y_top - 0.10, z, wheel_w)
 	var y_center: float = (y_bottom + y_top) * 0.5
 	var drive_x: float = front_x if drive_front else rear_x
 	var idler_x: float = rear_x if drive_front else front_x
-	parts.append(_part_cyl(sprocket_r, sprocket_r, wheel_w * 0.8, 14, Vector3(drive_x, y_center, z), rot,
-		TONE_WHEEL, "track", PLAIN_UV, false))
-	parts.append(_part_cyl(sprocket_r * 0.4, sprocket_r * 0.4, wheel_w * 0.95, 10, Vector3(drive_x, y_center, z), rot,
-		TONE_METAL, "", PLAIN_UV, false))
-	parts.append(_part_cyl(idler_r, idler_r, wheel_w * 0.75, 14, Vector3(idler_x, y_center, z), rot,
-		TONE_WHEEL, "track", PLAIN_UV, false))
-	parts.append(_part_cyl(idler_r * 0.38, idler_r * 0.38, wheel_w * 0.9, 10, Vector3(idler_x, y_center, z), rot,
-		TONE_METAL, "", PLAIN_UV, false))
-	return added + 4
+	_add_sprocket(parts, drive_x, y_center, z, sprocket_r, wheel_w, 10)
+	_add_idler(parts, idler_x, y_center, z, idler_r, wheel_w, 6)
+	# mocowania osi kół: dwa wsporniki przy kole napędowym i napinającym
+	for x in [drive_x, idler_x]:
+		parts.append(_part_box(Vector3(0.3, 0.34, 0.24), Vector3(x, y_center, z * 0.82),
+			Vector3.ZERO, TONE_DEEP, "armor", PLAIN_UV, false))
+		parts.append(_part_box(Vector3(0.16, 0.16, 0.3), Vector3(x, y_center, z * 0.62),
+			Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
 
 
-## Koło nośne wozu kołowego (BTR-60): opona, felga, piasta i osłona.
-func _add_vehicle_wheel(parts: Array, x: float, z: float, radius: float, width: float) -> void:
-	_add_road_wheel(parts, x, radius + 0.04, z, radius, width)
-	parts.append(_part_box(Vector3(0.5, 0.34, 0.16), Vector3(x, radius * 1.9, z), Vector3.ZERO,
-		TONE_DEEP, "armor", PLAIN_UV, false))
+## Koło nośne wozu kołowego (BTR-60): opona z klockami bieżni, felga, piasta
+## i osłona błotnika. `treads` to liczba klocków bieżni na oponie.
+func _add_vehicle_wheel(parts: Array, x: float, z: float, radius: float, width: float,
+		treads: int) -> void:
+	var y: float = radius + 0.04
+	var rot := Vector3(PI * 0.5, 0.0, 0.0)
+	parts.append(_part_cyl(radius, radius, width, 18, Vector3(x, y, z), rot, TONE_WHEEL, "armor", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.58, radius * 0.58, width * 1.1, 14, Vector3(x, y, z), rot, TONE_DEEP, "armor", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.26, radius * 0.26, width * 1.2, 10, Vector3(x, y, z), rot, TONE_WHEEL, "armor", PLAIN_UV, false))
+	parts.append(_part_cyl(radius * 0.12, radius * 0.12, width * 1.32, 8, Vector3(x, y, z), rot, TONE_METAL, "", PLAIN_UV, false))
+	_add_hub_bolts(parts, x, y, z + width * 0.62, radius * 0.4, 5)
+	for t in range(treads):
+		var a: float = TAU * float(t) / float(treads)
+		parts.append(_part_box(Vector3(0.17, 0.1, width * 1.06),
+			Vector3(x + cos(a) * radius, y + sin(a) * radius, z),
+			Vector3(0.0, 0.0, a), TONE_TRACK, "armor", PLAIN_UV, false))
+	# błotnik nad kołem
+	parts.append(_part_box(Vector3(radius * 1.75, 0.1, width * 1.25),
+		Vector3(x, radius * 2.0 + 0.1, z), Vector3.ZERO, TONE_DEEP, "armor", PLAIN_UV, false))
+
+
+## Osłona wlotu powietrza / chłodnicy: rama i żaluzje z cienkich brył.
+func _add_grille(parts: Array, center: Vector3, w: float, d: float, slats: int) -> void:
+	parts.append(_part_box(Vector3(w, 0.08, d), center, Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+	for i in range(slats):
+		var z_off: float = (float(i) - float(slats - 1) * 0.5) * (d / float(slats))
+		parts.append(_part_box(Vector3(w * 0.92, 0.05, d * 0.45 / float(slats)),
+			center + Vector3(0.0, 0.055, z_off), Vector3.ZERO, TONE_DARK, "armor", PLAIN_UV))
+
+
+## Rząd łbów śrub albo uchwytów — drobny detal w równym rytmie.
+func _add_bolt_row(parts: Array, start: Vector3, step: Vector3, count: int,
+		tone: float = TONE_DEEP) -> void:
+	for i in range(count):
+		parts.append(_part_box(Vector3(0.09, 0.06, 0.09), start + step * float(i),
+			Vector3.ZERO, tone, "armor", PLAIN_UV, false))
+
+
+## Poręcz / reling z segmentów.
+func _add_rail(parts: Array, start: Vector3, end: Vector3, segments: int,
+		tone: float = TONE_DEEP) -> void:
+	for i in range(segments):
+		var t0: float = float(i) / float(segments)
+		var t1: float = float(i + 1) / float(segments)
+		var a: Vector3 = start.lerp(end, t0)
+		var b: Vector3 = start.lerp(end, t1)
+		var mid: Vector3 = (a + b) * 0.5
+		var d: Vector3 = b - a
+		parts.append(_part_box(Vector3(maxf(d.length(), 0.08), 0.055, 0.055), mid,
+			Vector3(0.0, 0.0, atan2(d.y, d.x)), tone, "armor", PLAIN_UV, false))
+
+
+## Lina holownicza biegnąca wzdłuż burty — rząd walców.
+func _add_cable_run(parts: Array, start: Vector3, end: Vector3, segments: int) -> void:
+	for i in range(segments):
+		var t0: float = float(i) / float(segments)
+		var t1: float = float(i + 1) / float(segments)
+		var a: Vector3 = start.lerp(end, t0)
+		var b: Vector3 = start.lerp(end, t1)
+		var mid: Vector3 = (a + b) * 0.5
+		var d: Vector3 = b - a
+		parts.append(_part_cyl(0.045, 0.045, d.length(), 6, mid,
+			Vector3(0.0, 0.0, atan2(d.y, d.x) - PI * 0.5), TONE_METAL, "", PLAIN_UV, false))
+	# oczka na końcach
+	parts.append(_part_box(Vector3(0.14, 0.14, 0.08), start, Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_box(Vector3(0.14, 0.14, 0.08), end, Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+
+
+## Kanister na paliwo w koszu: korpus, uchwyt, wieczko.
+func _add_jerry_can(parts: Array, pos: Vector3, rot: Vector3 = Vector3.ZERO) -> void:
+	parts.append(_part_box(Vector3(0.18, 0.42, 0.32), pos, rot, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.2, 0.06, 0.1), pos + Vector3(0.0, 0.24, 0.0), rot, TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.1, 0.08, 0.1), pos + Vector3(0.0, 0.24, 0.1), rot, TONE_METAL, ""))
+
+
+## Skrzynia/bagażnik: korpus i wieko.
+func _add_stowage_box(parts: Array, size: Vector3, pos: Vector3, rot: Vector3 = Vector3.ZERO) -> void:
+	parts.append(_part_box(size, pos, rot, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(size.x * 0.94, size.y * 0.22, size.z * 1.04),
+		pos + Vector3(0.0, size.y * 0.58, 0.0), rot, TONE_DARK, "armor"))
+
+
+## Narzędzia pokładowe łopata, siekiera i kilof w uchwytach.
+func _add_tool_row(parts: Array, base: Vector3, rot: Vector3, along_x: bool) -> void:
+	var dir := Vector3(0.55, 0.0, 0.0) if along_x else Vector3(0.0, 0.0, 0.55)
+	parts.append(_part_cyl(0.035, 0.035, 0.85, 6, base, rot + Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_box(Vector3(0.22, 0.14, 0.05), base + dir, rot, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.035, 0.035, 0.75, 6, base + Vector3(0.0, -0.06, 0.14), rot + Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, "", PLAIN_UV, false))
+	parts.append(_part_box(Vector3(0.2, 0.1, 0.06), base + dir + Vector3(0.0, -0.06, 0.14), rot, TONE_METAL, ""))
+
+
+## Wyrzutnie granatów dymnych: płyta nośna i rury.
+func _add_smoke_bank(parts: Array, x: float, y: float, z: float, side: float, tubes: int) -> void:
+	parts.append(_part_box(Vector3(0.22, 0.18, 0.1), Vector3(x, y, z), Vector3.ZERO, TONE_DEEP, "armor"))
+	for i in range(tubes):
+		parts.append(_part_cyl(0.06, 0.06, 0.24, 6,
+			Vector3(x - float(i) * 0.16, y + 0.1, z + side * 0.09),
+			Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
+
+
+## Wieżyczka dowódcy: pierścień, właz, podstawa i rkm na obrotnicy.
+func _add_cupola(parts: Array, pos: Vector3, radius: float) -> void:
+	parts.append(_part_cyl(radius, radius * 1.06, 0.18, 14, pos, Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+	parts.append(_part_cyl(radius * 0.86, radius * 0.86, 0.12, 12, pos + Vector3(0.0, 0.15, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	parts.append(_part_box(Vector3(0.34, 0.08, 0.34), pos + Vector3(-0.06, 0.26, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.2, 0.18, 0.2), pos + Vector3(0.16, 0.3, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.035, 0.035, 0.62, 6, pos + Vector3(0.52, 0.32, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.12, 0.12, 0.1), pos + Vector3(0.28, 0.32, 0.0), Vector3.ZERO, TONE_METAL, ""))
+
+
+## Antena z podstawą i trzema segmentami.
+func _add_antenna(parts: Array, pos: Vector3, height: float) -> void:
+	parts.append(_part_cyl(0.06, 0.07, 0.12, 8, pos, Vector3.ZERO, TONE_DEEP, "armor"))
+	for i in range(3):
+		var seg: float = height * (1.0 - float(i) * 0.18)
+		parts.append(_part_cyl(0.022, 0.018, seg, 4,
+			pos + Vector3(0.0, 0.12 + seg * 0.5 + height * 0.16 * float(i), 0.0),
+			Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+
+
+## Reflektor z osłoną i uchwytem.
+func _add_light(parts: Array, pos: Vector3, side: float, lamp_r: float = 0.13) -> void:
+	parts.append(_part_cyl(lamp_r, lamp_r, 0.16, 10, pos, Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.1, lamp_r * 2.6, 0.06), pos + Vector3(0.1, 0.0, side * lamp_r * 1.5), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.1, lamp_r * 2.6, 0.06), pos + Vector3(0.1, 0.0, -side * lamp_r * 1.5), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.12, 0.06, lamp_r * 3.2), pos + Vector3(0.1, lamp_r * 1.4, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+
+
+## Peryskop: obudowa i ciemna szybka.
+func _add_periscope(parts: Array, pos: Vector3, rot: Vector3 = Vector3.ZERO) -> void:
+	parts.append(_part_box(Vector3(0.18, 0.12, 0.14), pos, rot, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.14, 0.07, 0.16), pos + Vector3(0.0, 0.075, 0.0), rot, TONE_METAL, ""))
 
 
 ## Pojedyncza gwiazda państwowa: `flat` daje płytkę poziomą (na dach — tak
@@ -650,100 +818,127 @@ func _star_plate(key: String, size: float, pos: Vector3, rot: Vector3 = Vector3.
 		flat: bool = false) -> Dictionary:
 	var dim: Vector3 = Vector3(size, 0.03, size) if flat else Vector3(size, size, 0.03)
 	return _part_marking(dim, pos, rot, key)
-
-
 # --- czołgi -------------------------------------------------------------------
 
 
-## Sylwetka czołgu: 256 brył, kształt zależny od jednostki.
+## Sylwetka czołgu: 1024 bryły, kształt zależny od jednostki.
 func _armor_parts(def_id: String) -> Array:
-	var side: String = _side_of(def_id)
-	var shape: String = str(ARMOR_SHAPES.get(def_id, "patton" if side == "us" else "t54"))
+	var shape: String = str(ARMOR_SHAPES.get(def_id, "m60a1"))
 	match shape:
 		"sheridan":
 			return _sheridan_parts(def_id)
-		"t54":
-			return _t54_parts(def_id)
+		"mbt70":
+			return _mbt70_parts(def_id)
+		"t62":
+			return _t62_parts(def_id)
 		"t72":
 			return _t72_parts(def_id)
+		"obj775":
+			return _obj775_parts(def_id)
 		_:
-			return _patton_parts(def_id)
+			return _m60a1_parts(def_id, false)
 
 
-## M48A5 / M60A1 „Patton”: kadłub 6,9 m, sześć kół jezdnych, wysoka wieża odlewana
-## z koszem z tyłu, działo 105 mm i (w M60A1) reflektor-powietrzny nad lufą.
-func _patton_parts(def_id: String) -> Array:
+## M60A1 „Patton”: kadłub 6,9 m, sześć kół jezdnych, wysoka wieża odlewana
+## z koszem z tyłu, działo 105 mm i reflektor-powietrzny AN/VSS-1 nad lufą.
+## Wariant `cev` to M728 CEV: lemiesz spychacza, żuraw ramowy i krótkie działo.
+func _m60a1_parts(def_id: String, cev: bool) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
-	var m48: bool = def_id == "us_arm_m48a5"
-	# kadłub: wanna, górna część, pokład
+	var star: String = "star_su" if side == "su" else "star_us"
+	# kadłub: wanna, burt, pokład, glacis, rufa
 	parts.append(_part_box(Vector3(6.5, 0.62, 2.45), Vector3(0.0, 0.80, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.9, 0.55, 2.50), Vector3(0.0, 1.37, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.85, 0.12, 2.56), Vector3(0.0, 1.70, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	# przód: M60 ma ścięty „dziób”, M48 — zaokrąglony
-	if m48:
-		parts.append(_part_cyl(0.52, 0.52, 2.45, 16, Vector3(3.35, 1.05, 0.0), Vector3(PI * 0.5, 0.0, 0.0), TONE_BODY, "armor", HULL_UV))
-	else:
-		parts.append(_part_box(Vector3(2.3, 0.14, 2.56), Vector3(3.0, 1.32, 0.0), Vector3(0.0, 0.0, -0.62), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(2.3, 0.14, 2.56), Vector3(3.0, 1.32, 0.0), Vector3(0.0, 0.0, -0.62), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.3, 0.55, 2.40), Vector3(3.55, 0.95, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	# płyta tylna i osłona przekładni
 	parts.append(_part_box(Vector3(1.5, 1.0, 2.45), Vector3(-2.95, 1.25, 0.0), Vector3(0.0, 0.0, 0.5), TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(0.5, 0.7, 2.30), Vector3(-3.45, 1.0, 0.0), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
-	# błotniki i fartuchy nad gąsienicami
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.8, Vector3(-0.2, 2.72, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.55, Vector3(-1.35, 2.05, z * 1.22)))
 	parts.append(_star_plate(star, 0.6, Vector3(-3.72, 1.0, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# błotniki w segmentach z podporami, kosze boczne
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(6.5, 0.10, 0.85), Vector3(-0.1, 1.46, s * 1.34), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-		parts.append(_part_box(Vector3(1.2, 0.5, 0.14), Vector3(3.05, 1.15, s * 1.34), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.7, 0.45, 0.14), Vector3(-3.0, 1.15, s * 1.34), Vector3.ZERO, TONE_DEEP, "armor"))
-	# wieża: kopuła odlewana (półkula) z koszem z tyłu
+		for seg in range(3):
+			parts.append(_part_box(Vector3(2.1, 0.10, 0.85),
+				Vector3(2.2 - float(seg) * 2.25, 1.46, s * 1.34), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		for seg in range(3):
+			parts.append(_part_box(Vector3(0.12, 0.3, 0.6),
+				Vector3(3.1 - float(seg) * 2.3, 1.26, s * 1.28), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_stowage_box(parts, Vector3(1.2, 0.5, 0.7), Vector3(-2.6, 1.9, s * 0.85))
+		_add_stowage_box(parts, Vector3(0.7, 0.45, 0.6), Vector3(-3.3, 1.75, s * 0.8))
+	# wloty powietrza, wydech
+	for s in [-1.0, 1.0]:
+		_add_grille(parts, Vector3(-1.1, 1.79, s * 0.72), 1.7, 1.05, 8)
+		parts.append(_part_cyl(0.13, 0.13, 0.5, 10, Vector3(-2.35, 1.55, s * 1.05), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.4, 0.2, 0.34), Vector3(-2.35, 1.68, s * 1.05), Vector3.ZERO, TONE_DEEP, "armor"))
+	# włazy kierowcy i mechanika, peryskopy
+	parts.append(_part_cyl(0.34, 0.34, 0.12, 12, Vector3(2.35, 1.82, -0.55), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.5, 0.08, 0.44), Vector3(2.35, 1.92, -0.55), Vector3.ZERO, TONE_DARK, "armor"))
+	_add_periscope(parts, Vector3(2.75, 1.86, -0.55))
+	_add_periscope(parts, Vector3(2.75, 1.86, 0.55))
+	_add_periscope(parts, Vector3(1.35, 1.86, 0.0))
+	# reflektory z osłonami
+	for s in [-1.0, 1.0]:
+		_add_light(parts, Vector3(3.35, 1.5, s * 0.9), s)
+	# narzędzia, liny, kanistry, uchwyty
+	for s in [-1.0, 1.0]:
+		_add_tool_row(parts, Vector3(0.6, 1.55, s * 1.3), Vector3.ZERO, true)
+		_add_cable_run(parts, Vector3(3.3, 1.5, s * 1.32), Vector3(-2.2, 1.5, s * 1.32), 8)
+		_add_jerry_can(parts, Vector3(-0.4, 1.78, s * 1.12))
+		_add_bolt_row(parts, Vector3(3.1, 1.28, s * 1.4), Vector3(-0.34, 0.0, 0.0), 10)
+		_add_bolt_row(parts, Vector3(2.9, 1.14, s * 1.4), Vector3(-0.34, 0.0, 0.0), 9)
+	parts.append(_part_box(Vector3(0.22, 0.14, 0.12), Vector3(3.75, 0.85, 1.0), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.22, 0.14, 0.12), Vector3(3.75, 0.85, -1.0), Vector3.ZERO, TONE_METAL, ""))
+	# wieża: kopuła odlewana z koszem i jarzmem
 	parts.append(_part_sphere(1.45, 0.95, 24, 10, true, Vector3(0.0, 1.74, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(1.5, 1.52, 0.16, 20, Vector3(0.0, 1.76, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.9, 0.6, 2.4), Vector3(-1.35, 2.05, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(0.5, 0.5, 0.6), Vector3(1.15, 2.2, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
-	# jarzmo działa i lufa 105 mm (bez przedmuchiwacza, z koszulką)
+	parts.append(_part_box(Vector3(1.2, 0.5, 2.2), Vector3(-2.15, 2.0, 0.0), Vector3(0.0, 0.0, 0.18), TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.9, 0.55, 1.6), Vector3(1.15, 2.15, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	# jarzmo i działo
 	parts.append(_part_cyl(0.46, 0.46, 0.7, 16, Vector3(1.45, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
-	parts.append(_part_cyl(0.095, 0.105, 3.9, 14, Vector3(3.75, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
-	parts.append(_part_cyl(0.13, 0.13, 1.6, 12, Vector3(2.6, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.12, 0.12, 0.26, 12, Vector3(5.8, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	# włazy, km-y, wyrzutnie granatów dymnych, anteny
-	parts.append(_part_cyl(0.42, 0.42, 0.34, 14, Vector3(-0.35, 2.78, 0.62), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.3, 0.26, 0.28), Vector3(-0.35, 2.98, 0.62), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.05, 0.05, 0.95, 8, Vector3(-0.35, 3.1, 1.05), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_cyl(0.36, 0.36, 0.3, 14, Vector3(0.5, 2.72, -0.62), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.24, 0.22, 0.24), Vector3(0.5, 2.9, -0.62), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.04, 0.04, 0.8, 8, Vector3(0.5, 2.98, -1.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	for smoke in range(6):
-		var sd: float = 1.0 if smoke % 2 == 0 else -1.0
-		var row: int = smoke >> 1
-		parts.append(_part_cyl(0.06, 0.06, 0.24, 6,
-			Vector3(1.0 - float(row) * 0.22, 2.55, sd * 1.18), Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
-	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.02, 0.02, 1.7, 4, Vector3(-1.15, 3.35, s * 0.85), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-	if not m48:
-		# charakterystyczny reflektor AN/VSS-1 nad działem (M60A1)
+	if cev:
+		# M728 CEV: krótkie działo 165 mm, lemiesz i żuraw
+		parts.append(_part_cyl(0.22, 0.24, 1.6, 12, Vector3(2.55, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+		parts.append(_part_cyl(0.16, 0.16, 0.3, 10, Vector3(3.45, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.5, 0.7, 2.6), Vector3(3.95, 1.15, 0.0), Vector3(0.0, 0.0, -0.35), TONE_DEEP, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(0.35, 0.5, 2.6), Vector3(4.25, 0.85, 0.0), Vector3(0.0, 0.0, -0.35), TONE_DARK, "armor"))
+		for s in [-1.0, 1.0]:
+			parts.append(_part_box(Vector3(1.1, 0.16, 0.16), Vector3(3.6, 1.7, s * 0.9), Vector3(0.0, 0.0, -0.5), TONE_METAL, ""))
+		parts.append(_part_cyl(0.06, 0.06, 1.9, 6, Vector3(-0.4, 3.35, 0.0), Vector3(0.0, 0.0, 0.45), TONE_METAL, ""))
+		parts.append(_part_cyl(0.05, 0.05, 1.2, 6, Vector3(-1.15, 3.25, 0.0), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
+		parts.append(_part_box(Vector3(0.18, 0.18, 0.18), Vector3(-0.75, 4.25, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	else:
+		parts.append(_part_cyl(0.095, 0.105, 3.9, 14, Vector3(3.75, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
+		parts.append(_part_cyl(0.13, 0.13, 1.6, 12, Vector3(2.6, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+		parts.append(_part_cyl(0.12, 0.12, 0.26, 12, Vector3(5.8, 2.35, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		# reflektor AN/VSS-1 nad działem
 		parts.append(_part_cyl(0.38, 0.38, 0.5, 16, Vector3(2.5, 2.72, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DARK, "armor"))
 		parts.append(_part_box(Vector3(0.2, 0.5, 0.3), Vector3(2.2, 2.5, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
-	# reflektory, wydech, narzędzia, skrzynie
+		parts.append(_part_box(Vector3(0.34, 0.1, 0.34), Vector3(2.5, 2.98, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	# włazy, km dowódcy, wyrzutnie dymne, anteny, poręcze
+	_add_cupola(parts, Vector3(-0.35, 2.72, 0.62), 0.42)
+	parts.append(_part_cyl(0.36, 0.36, 0.3, 14, Vector3(0.5, 2.72, -0.62), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.24, 0.22, 0.24), Vector3(0.5, 2.9, -0.62), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 1.0, 2.55, 1.18, 1.0, 3)
+	_add_smoke_bank(parts, 1.0, 2.55, -1.18, -1.0, 3)
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.13, 0.13, 0.18, 12, Vector3(3.35, 1.5, s * 0.9), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.24, 0.3), Vector3(3.45, 1.62, s * 0.9), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.9, 0.5, 0.7), Vector3(-2.6, 1.9, s * 0.85), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.7, 0.45, 0.6), Vector3(-3.3, 1.75, s * 0.8), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.22, 0.14, 0.12), Vector3(3.75, 0.85, s * 1.0), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_box(Vector3(1.1, 0.26, 0.32), Vector3(-3.5, 1.6, 1.15), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.09, 0.09, 0.45, 10, Vector3(-3.95, 1.6, 1.15), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_cyl(0.035, 0.035, 3.4, 6, Vector3(0.4, 1.42, 1.28), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.9, 0.09, 0.14), Vector3(-1.5, 1.44, 1.24), Vector3.ZERO, TONE_DEEP, "armor"))
-	# gąsienice: sześć kół, trzy rolki, napęd z tyłu
+		_add_antenna(parts, Vector3(-1.15, 2.85, s * 0.85), 1.7)
+		_add_rail(parts, Vector3(0.9, 2.62, s * 1.28), Vector3(-1.7, 2.5, s * 1.28), 3)
+		_add_rail(parts, Vector3(-1.7, 2.5, s * 1.28), Vector3(-2.2, 2.2, s * 1.2), 2)
+		for link in range(6):
+			parts.append(_part_box(Vector3(0.2, 0.07, 0.56),
+				Vector3(0.7 - float(link) * 0.26, 2.42, s * 1.3), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie: sześć kół, trzy rolki, napęd z tyłu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.34, 6, 0.33, 0.6, 3.7, 3.35, -3.35, 0.06, 1.06, 3, false, 0.38, 0.34)
-	var per_belt: int = maxi(12, (ARMOR_PARTS - parts.size()) >> 1)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.34, 0.6, 3.35, -3.35, 0.06, 1.06)
-	return _fit_parts(parts, ARMOR_PARTS, Vector3(2.2, 1.78, -1.1), Vector3(-0.24, 0.075, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.2, 1.78, -1.1), Vector3(-0.24, 0.075, 0.0), "links")
 
 
 ## M551 Sheridan: lekki czołg powietrznodesantowy — niska sylwetka, pięć dużych
@@ -751,128 +946,249 @@ func _patton_parts(def_id: String) -> Array:
 func _sheridan_parts(def_id: String) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_part_box(Vector3(5.7, 0.5, 2.3), Vector3(0.0, 0.70, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.1, 0.55, 2.35), Vector3(0.0, 1.22, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.0, 0.12, 2.4), Vector3(0.0, 1.55, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(2.5, 0.12, 2.4), Vector3(2.45, 1.15, 0.0), Vector3(0.0, 0.0, -0.85), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(0.9, 0.5, 2.3), Vector3(2.9, 0.85, 0.0), Vector3(0.0, 0.0, -0.3), TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.2, 0.9, 2.3), Vector3(-2.7, 1.10, 0.0), Vector3(0.0, 0.0, 0.5), TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.7, Vector3(0.0, 2.44, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.45, Vector3(-0.9, 1.9, z * 1.14)))
+	# falochron, błotniki, skrzynie
+	parts.append(_part_box(Vector3(1.7, 0.1, 2.35), Vector3(3.15, 1.32, 0.0), Vector3(0.0, 0.0, -0.45), TONE_BODY, "armor", HULL_UV))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(5.6, 0.10, 0.8), Vector3(0.0, 1.3, s * 1.22), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-		parts.append(_part_box(Vector3(1.0, 0.42, 0.14), Vector3(2.75, 1.05, s * 1.22), Vector3.ZERO, TONE_DEEP, "armor"))
-	# wieża: odlewana kopuła, działo 152 mm z przedmuchiwaczem i wylotem
+		for seg in range(3):
+			parts.append(_part_box(Vector3(1.85, 0.10, 0.8),
+				Vector3(1.95 - float(seg) * 1.95, 1.3, s * 1.22), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		_add_stowage_box(parts, Vector3(0.7, 0.4, 0.6), Vector3(-2.3, 1.6, s * 0.8))
+		_add_bolt_row(parts, Vector3(2.6, 1.16, s * 1.28), Vector3(-0.32, 0.0, 0.0), 8)
+		_add_cable_run(parts, Vector3(2.7, 1.35, s * 1.26), Vector3(-1.6, 1.35, s * 1.26), 7)
+		_add_tool_row(parts, Vector3(0.2, 1.45, s * 1.2), Vector3.ZERO, true)
+	_add_grille(parts, Vector3(-1.4, 1.64, 0.62), 1.3, 0.95, 7)
+	_add_grille(parts, Vector3(-1.4, 1.64, -0.62), 1.3, 0.95, 7)
+	parts.append(_part_cyl(0.12, 0.12, 0.42, 10, Vector3(-2.25, 1.5, 0.95), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_cyl(0.12, 0.12, 0.42, 10, Vector3(-2.25, 1.5, -0.95), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	_add_periscope(parts, Vector3(2.65, 1.72, -0.5))
+	_add_periscope(parts, Vector3(2.65, 1.72, 0.5))
+	for s in [-1.0, 1.0]:
+		_add_light(parts, Vector3(3.1, 0.9, s * 1.0), s, 0.12)
+	# wieża odlewana, działo 152 mm
 	parts.append(_part_sphere(1.3, 0.8, 24, 10, true, Vector3(0.0, 1.62, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(1.34, 1.36, 0.14, 18, Vector3(0.0, 1.63, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_cyl(0.42, 0.42, 0.6, 16, Vector3(1.25, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
 	parts.append(_part_cyl(0.13, 0.14, 3.0, 14, Vector3(3.05, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(2.5, 1.0, 1.0)))
 	parts.append(_part_cyl(0.21, 0.21, 0.7, 14, Vector3(3.4, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.16, 0.16, 0.3, 12, Vector3(4.6, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_cyl(0.34, 0.34, 0.28, 14, Vector3(-0.35, 2.32, 0.55), Vector3.ZERO, TONE_DEEP, "armor"))
+	_add_cupola(parts, Vector3(-0.35, 2.32, 0.55), 0.34)
 	parts.append(_part_cyl(0.34, 0.34, 0.28, 14, Vector3(0.45, 2.28, -0.55), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.28, 0.24, 0.26), Vector3(-0.35, 2.5, 0.55), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.04, 0.04, 0.8, 8, Vector3(-0.35, 2.6, 0.9), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.28, 0.24, 0.26), Vector3(0.45, 2.46, -0.55), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 0.75, 2.32, 1.02, 1.0, 3)
+	_add_smoke_bank(parts, 0.75, 2.32, -1.02, -1.0, 3)
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.02, 0.02, 1.5, 4, Vector3(-0.9, 3.0, s * 0.7), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_cyl(0.12, 0.12, 0.16, 12, Vector3(3.1, 0.9, s * 1.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.7, 0.4, 0.6), Vector3(-2.3, 1.6, s * 0.8), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.9, 0.2, 0.3), Vector3(-3.2, 1.35, 0.9), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.8, 0.08, 0.14), Vector3(-1.0, 1.3, 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_antenna(parts, Vector3(-0.9, 2.45, s * 0.7), 1.5)
+		_add_rail(parts, Vector3(0.7, 2.32, s * 1.1), Vector3(-1.3, 2.22, s * 1.1), 3)
+		for link in range(5):
+			parts.append(_part_box(Vector3(0.2, 0.07, 0.5),
+				Vector3(0.5 - float(link) * 0.24, 2.26, s * 1.14), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie: pięć kół, napęd z przodu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.22, 5, 0.34, 0.55, 3.2, 2.95, -2.95, 0.06, 0.92, 3, true, 0.36, 0.32)
-	var per_belt: int = maxi(12, (ARMOR_PARTS - parts.size()) >> 1)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.22, 0.55, 2.95, -2.95, 0.06, 0.92)
-	return _fit_parts(parts, ARMOR_PARTS, Vector3(2.3, 1.6, -1.0), Vector3(-0.22, 0.07, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.3, 1.6, -1.0), Vector3(-0.22, 0.07, 0.0), "links")
 
 
-## T-55 / T-62: niski kadłub 6,2 m, pięć dużych kół, napęd z tyłu, kopułowa
-## wieża odlewana i dwie beczki paliwa na tyle. T-62 ma działo 115 mm.
-func _t54_parts(def_id: String) -> Array:
+## MBT-70 (KPz 70): wspólny projekt USA i RFN z lat 60. — kadłub 7,2 m, siedem
+## kół, napęd z tyłu, a nad nim ogromna płaska wieża szersza od kadłuba z
+## działem 152 mm i zdalnym działkiem 20 mm w kopułce dowódcy.
+func _mbt70_parts(def_id: String) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
-	var t62: bool = def_id == "su_arm_t62"
-	parts.append(_part_box(Vector3(5.9, 0.6, 2.45), Vector3(0.0, 0.72, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(6.2, 0.5, 2.50), Vector3(0.0, 1.28, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(6.1, 0.12, 2.55), Vector3(0.0, 1.60, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(2.0, 0.13, 2.55), Vector3(2.75, 1.22, 0.0), Vector3(0.0, 0.0, -0.95), TONE_BODY, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(0.9, 0.5, 2.45), Vector3(3.1, 0.72, 0.0), Vector3(0.0, 0.0, -0.25), TONE_DARK, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(1.3, 1.0, 2.45), Vector3(-2.9, 1.10, 0.0), Vector3(0.0, 0.0, 0.55), TONE_DARK, "armor", HULL_UV))
 	var star: String = "star_su" if side == "su" else "star_us"
+	# kadłub: bardzo niski, szeroki, ze spadzistym glacis
+	parts.append(_part_box(Vector3(6.4, 0.55, 2.7), Vector3(0.0, 0.72, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.8, 0.5, 2.78), Vector3(0.0, 1.18, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.7, 0.12, 2.84), Vector3(0.0, 1.48, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(2.2, 0.14, 2.84), Vector3(3.15, 1.12, 0.0), Vector3(0.0, 0.0, -0.5), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.1, 0.5, 2.7), Vector3(3.65, 0.85, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.3, 0.85, 2.7), Vector3(-3.15, 1.05, 0.0), Vector3(0.0, 0.0, 0.45), TONE_DARK, "armor", HULL_UV))
+	parts.append(_star_plate(star, 0.75, Vector3(-1.2, 2.28, 0.0), Vector3.ZERO, true))
+	for z in [-1.0, 1.0]:
+		parts.append(_star_plate(star, 0.5, Vector3(-2.2, 1.35, z * 1.36)))
+	parts.append(_star_plate(star, 0.55, Vector3(-3.85, 1.05, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# fartuchy boczne nad siedmioma kołami, błotniki
+	for s in [-1.0, 1.0]:
+		for seg in range(4):
+			parts.append(_part_box(Vector3(1.65, 0.32, 0.14),
+				Vector3(2.5 - float(seg) * 1.7, 1.28, s * 1.52), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+		for seg in range(3):
+			parts.append(_part_box(Vector3(2.2, 0.10, 0.8), Vector3(2.2 - float(seg) * 2.25, 1.5, s * 1.5), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		_add_stowage_box(parts, Vector3(1.0, 0.5, 0.72), Vector3(-2.2, 1.85, s * 1.02))
+		_add_bolt_row(parts, Vector3(3.0, 1.16, s * 1.6), Vector3(-0.34, 0.0, 0.0), 10)
+		_add_cable_run(parts, Vector3(3.2, 1.42, s * 1.58), Vector3(-2.4, 1.42, s * 1.58), 8)
+		_add_tool_row(parts, Vector3(0.4, 1.5, s * 1.5), Vector3.ZERO, true)
+	for s in [-1.0, 1.0]:
+		_add_grille(parts, Vector3(-1.5, 1.57, s * 0.78), 1.6, 1.1, 8)
+		parts.append(_part_cyl(0.15, 0.15, 0.55, 10, Vector3(-2.75, 1.5, s * 1.1), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.45, 0.22, 0.38), Vector3(-2.75, 1.66, s * 1.1), Vector3.ZERO, TONE_DEEP, "armor"))
+	_add_periscope(parts, Vector3(2.9, 1.6, -0.6))
+	_add_periscope(parts, Vector3(2.9, 1.6, 0.6))
+	for s in [-1.0, 1.0]:
+		_add_light(parts, Vector3(3.55, 1.25, s * 1.05), s)
+	# wieża: szeroki, płaski blok o pochylonych burtach (znak rozpoznawczy MBT-70)
+	parts.append(_part_box(Vector3(3.4, 0.95, 3.1), Vector3(0.25, 1.95, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(3.2, 0.2, 3.18), Vector3(0.25, 2.5, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	for s in [-1.0, 1.0]:
+		parts.append(_part_box(Vector3(3.3, 0.85, 0.22), Vector3(0.25, 1.98, s * 1.62), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(1.15, 0.42, 0.24), Vector3(0.35, 2.05, s * 1.72), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.9, 0.85, 2.9), Vector3(2.05, 1.98, 0.0), Vector3(0.0, 0.0, -0.28), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.5, 0.75, 2.85), Vector3(-1.55, 1.92, 0.0), Vector3(0.0, 0.0, 0.12), TONE_DARK, "armor", HULL_UV))
+	# jarzmo i działo 152 mm z przedmuchiwaczem
+	parts.append(_part_cyl(0.5, 0.5, 0.8, 16, Vector3(2.15, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
+	parts.append(_part_cyl(0.13, 0.15, 3.9, 14, Vector3(4.5, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
+	parts.append(_part_cyl(0.19, 0.19, 1.1, 12, Vector3(3.85, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.16, 0.16, 0.32, 12, Vector3(6.55, 2.15, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.55, 0.45, 0.55), Vector3(2.55, 2.15, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	# kopułka dowódcy z działkiem 20 mm (zdalnie sterowane)
+	_add_cupola(parts, Vector3(-0.85, 2.55, 0.95), 0.45)
+	parts.append(_part_box(Vector3(0.55, 0.42, 0.55), Vector3(-0.55, 2.85, 0.95), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.06, 0.07, 1.35, 8, Vector3(0.35, 2.95, 0.95), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.3, 0.24, 0.3), Vector3(-0.25, 2.95, 0.95), Vector3.ZERO, TONE_METAL, ""))
+	parts.append(_part_cyl(0.4, 0.4, 0.3, 14, Vector3(-0.55, 2.55, -0.95), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.3, 0.24, 0.3), Vector3(-0.55, 2.73, -0.95), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 1.35, 2.42, 1.32, 1.0, 3)
+	_add_smoke_bank(parts, 1.35, 2.42, -1.32, -1.0, 3)
+	for s in [-1.0, 1.0]:
+		_add_antenna(parts, Vector3(-1.75, 2.45, s * 1.15), 1.6)
+		_add_rail(parts, Vector3(1.7, 2.55, s * 1.66), Vector3(-1.2, 2.55, s * 1.66), 3)
+		for link in range(6):
+			parts.append(_part_box(Vector3(0.2, 0.07, 0.56),
+				Vector3(-0.2 - float(link) * 0.26, 2.3, s * 1.66), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie: siedem kół, napęd z tyłu, zawieszenie hydropneumatyczne
+	for s in [-1.0, 1.0]:
+		_add_running_gear(parts, s * 1.5, 7, 0.31, 0.58, 4.1, 3.55, -3.55, 0.06, 1.02, 3, false, 0.36, 0.32)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
+	for s in [-1.0, 1.0]:
+		_add_track_links(parts, per_belt, s * 1.5, 0.58, 3.55, -3.55, 0.06, 1.02)
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.2, 1.6, -1.2), Vector3(-0.24, 0.075, 0.0), "links")
+## T-62 Obr. 1972: kadłub 6,6 m, pięć kół rozstawionych równo (po tym odróżnia
+## się od T-55 z przerwą między pierwszą a drugą parą), wydłużona odlewana
+## wieża, działo gładkolufowe 115 mm bez hamulca wylotowego i rura do brodzenia
+## (OPVT) na dachu — dodatek z modernizacji 1972 roku.
+func _t62_parts(def_id: String) -> Array:
+	var parts: Array = []
+	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
+	parts.append(_part_box(Vector3(6.1, 0.6, 2.45), Vector3(0.0, 0.72, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.4, 0.5, 2.50), Vector3(0.0, 1.28, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.3, 0.12, 2.55), Vector3(0.0, 1.60, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(2.0, 0.13, 2.55), Vector3(2.85, 1.22, 0.0), Vector3(0.0, 0.0, -0.95), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.9, 0.5, 2.45), Vector3(3.2, 0.72, 0.0), Vector3(0.0, 0.0, -0.25), TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.3, 1.0, 2.45), Vector3(-3.0, 1.10, 0.0), Vector3(0.0, 0.0, 0.55), TONE_DARK, "armor", HULL_UV))
 	parts.append(_star_plate(star, 0.7, Vector3(0.2, 2.56, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.45, Vector3(-2.2, 1.35, z * 1.29)))
+	parts.append(_star_plate(star, 0.5, Vector3(-3.72, 1.1, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# błotniki, fartuchy, beczki paliwa z pasami
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(5.9, 0.10, 0.7), Vector3(-0.05, 1.32, s * 1.26), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		for seg in range(3):
+			parts.append(_part_box(Vector3(2.05, 0.10, 0.7), Vector3(2.1 - float(seg) * 2.15, 1.32, s * 1.26), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 		parts.append(_part_box(Vector3(0.9, 0.42, 0.13), Vector3(2.55, 1.08, s * 1.26), Vector3.ZERO, TONE_DEEP, "armor"))
 		parts.append(_part_box(Vector3(0.8, 0.4, 0.13), Vector3(-2.7, 1.08, s * 1.26), Vector3.ZERO, TONE_DEEP, "armor"))
-	# kopułowa wieża odlewana (półkula) — znak rozpoznawczy radzieckich czołgów
-	parts.append(_part_sphere(1.16, 0.92, 24, 10, true, Vector3(0.0, 1.62, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
-	parts.append(_part_cyl(0.42, 0.42, 0.75, 16, Vector3(1.15, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
-	if t62:
-		parts.append(_part_cyl(0.10, 0.11, 3.5, 14, Vector3(3.15, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
-		parts.append(_part_cyl(0.145, 0.145, 1.3, 12, Vector3(2.6, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.18, 0.18, 0.55, 12, Vector3(4.3, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.13, 0.13, 0.3, 12, Vector3(5.05, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	else:
-		parts.append(_part_cyl(0.09, 0.10, 3.3, 14, Vector3(3.15, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
-		parts.append(_part_cyl(0.17, 0.17, 0.5, 12, Vector3(3.4, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.11, 0.11, 0.28, 12, Vector3(4.9, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	# włazy w kopule, km przeciwlotniczy, wyrzutnie dymne, anteny
-	parts.append(_part_cyl(0.32, 0.32, 0.24, 14, Vector3(0.32, 2.44, 0.5), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.28, 0.28, 0.22, 14, Vector3(-0.32, 2.42, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.3, 0.24, 0.26), Vector3(-0.45, 2.62, 0.4), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.05, 0.05, 0.85, 8, Vector3(-0.45, 2.72, 0.78), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	for smoke in range(6):
-		var sd: float = 1.0 if smoke % 2 == 0 else -1.0
-		var row: int = smoke >> 1
-		parts.append(_part_cyl(0.06, 0.06, 0.22, 6,
-			Vector3(0.85 - float(row) * 0.2, 2.3, sd * 0.95), Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
+		parts.append(_part_cyl(0.30, 0.30, 1.0, 14, Vector3(-3.55, 1.55, s * 0.6), Vector3(0.0, 0.0, -PI * 0.5), TONE_WHEEL, "armor", Vector3(1.5, 1.0, 1.0)))
+		parts.append(_part_box(Vector3(0.1, 0.12, 0.66), Vector3(-3.55, 1.82, s * 0.6), Vector3.ZERO, TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(-3.55, 1.55, s * 1.12), Vector3.ZERO, TONE_METAL, ""))
+		_add_bolt_row(parts, Vector3(3.0, 1.12, s * 1.32), Vector3(-0.32, 0.0, 0.0), 9)
+		_add_cable_run(parts, Vector3(2.9, 1.4, s * 1.3), Vector3(-1.8, 1.4, s * 1.3), 7)
+		_add_tool_row(parts, Vector3(0.3, 1.42, s * 1.26), Vector3.ZERO, true)
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.02, 0.02, 1.6, 4, Vector3(-0.85, 2.9, s * 0.75), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-	# reflektory, wydechy po obu stronach, narzędzia i beczki paliwa
-	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.13, 0.13, 0.18, 12, Vector3(3.15, 1.4, s * 0.85), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.26, 0.3), Vector3(3.2, 1.52, s * 0.85), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_grille(parts, Vector3(-1.35, 1.69, s * 0.7), 1.5, 1.0, 8)
 		parts.append(_part_cyl(0.11, 0.11, 0.45, 10, Vector3(-2.4, 1.3, s * 1.12), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 		parts.append(_part_box(Vector3(0.65, 0.18, 0.24), Vector3(-2.4, 1.42, s * 1.12), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.30, 0.30, 1.0, 14, Vector3(-3.5, 1.55, s * 0.6), Vector3(0.0, 0.0, -PI * 0.5), TONE_WHEEL, "armor", Vector3(1.5, 1.0, 1.0)))
-		parts.append(_part_box(Vector3(0.1, 0.12, 0.66), Vector3(-3.5, 1.82, s * 0.6), Vector3.ZERO, TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(3.5, 0.7, s * 0.95), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.035, 0.035, 3.2, 6, Vector3(0.3, 1.34, 1.2), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(1.0, 0.08, 0.15), Vector3(-1.2, 1.36, 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
-	# gąsienice: pięć dużych kół, rolki, napęd z tyłu
+	_add_periscope(parts, Vector3(2.95, 1.68, -0.55))
+	_add_periscope(parts, Vector3(2.95, 1.68, 0.55))
 	for s in [-1.0, 1.0]:
-		_add_running_gear(parts, s * 1.26, 5, 0.40, 0.58, 3.1, 3.05, -3.05, 0.04, 1.0, 3, false, 0.38, 0.36)
-	var per_belt: int = maxi(12, (ARMOR_PARTS - parts.size()) >> 1)
+		_add_light(parts, Vector3(3.15, 1.4, s * 0.85), s)
+	# wieża: wydłużona odlewana kopuła, jarzmo i działo 115 mm (bez hamulca)
+	parts.append(_part_sphere(1.16, 0.92, 24, 10, true, Vector3(0.0, 1.62, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_sphere(1.05, 0.7, 20, 8, true, Vector3(-0.75, 1.62, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(1.24, 1.26, 0.15, 18, Vector3(0.0, 1.63, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_cyl(0.42, 0.42, 0.75, 16, Vector3(1.15, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
+	parts.append(_part_cyl(0.10, 0.11, 3.5, 14, Vector3(3.15, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
+	parts.append(_part_cyl(0.145, 0.145, 1.3, 12, Vector3(2.6, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.125, 0.125, 0.28, 12, Vector3(4.95, 2.08, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	# rura do brodzenia OPVT (modernizacja 1972) na prawej burcie wieży
+	parts.append(_part_cyl(0.14, 0.14, 1.6, 10, Vector3(-0.2, 2.35, 1.02), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.12, 0.12, 0.5, 10, Vector3(-1.15, 2.35, 1.02), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(1.2, 0.12, 0.16), Vector3(-0.2, 2.2, 1.02), Vector3.ZERO, TONE_DEEP, "armor"))
+	_add_cupola(parts, Vector3(0.32, 2.42, 0.5), 0.32)
+	parts.append(_part_cyl(0.28, 0.28, 0.22, 14, Vector3(-0.32, 2.42, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.3, 0.24, 0.26), Vector3(-0.45, 2.6, -0.4), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 0.85, 2.3, 0.95, 1.0, 3)
+	_add_smoke_bank(parts, 0.85, 2.3, -0.95, -1.0, 3)
 	for s in [-1.0, 1.0]:
-		_add_track_links(parts, per_belt, s * 1.26, 0.58, 3.05, -3.05, 0.04, 1.0)
-	return _fit_parts(parts, ARMOR_PARTS, Vector3(2.35, 1.68, -1.05), Vector3(-0.24, 0.07, 0.0), "links")
+		_add_antenna(parts, Vector3(-0.85, 2.62, s * 0.75), 1.6)
+		_add_rail(parts, Vector3(0.95, 2.36, s * 1.12), Vector3(-1.25, 2.26, s * 1.12), 3)
+		for link in range(5):
+			parts.append(_part_box(Vector3(0.2, 0.07, 0.52),
+				Vector3(0.15 - float(link) * 0.25, 2.22, s * 1.16), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie: pięć kół równo rozstawionych, napęd z tyłu
+	for s in [-1.0, 1.0]:
+		_add_running_gear(parts, s * 1.26, 5, 0.40, 0.58, 3.3, 3.15, -3.15, 0.04, 1.0, 3, false, 0.38, 0.36)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
+	for s in [-1.0, 1.0]:
+		_add_track_links(parts, per_belt, s * 1.26, 0.58, 3.15, -3.15, 0.04, 1.0)
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.35, 1.68, -1.05), Vector3(-0.24, 0.07, 0.0), "links")
 
 
-## T-72 „Ural”: kadłub 6,9 m, sześć kół, bardzo niska kopuła, działo 125 mm
-## z koszulką termiczną i rura do pokonywania przeszkód wodnych na tyle wieży.
+## T-72 „Ural”: kadłub 6,9 m, sześć kół, bardzo niska kopuła z klinami pancerza,
+## działo 125 mm z koszulką termiczną i rura do brodzenia na tyle wieży.
 func _t72_parts(def_id: String) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_part_box(Vector3(6.5, 0.6, 2.5), Vector3(0.0, 0.72, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.9, 0.5, 2.55), Vector3(0.0, 1.28, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.8, 0.12, 2.6), Vector3(0.0, 1.60, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(2.6, 0.13, 2.6), Vector3(3.0, 1.2, 0.0), Vector3(0.0, 0.0, -0.72), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.0, 0.5, 2.5), Vector3(3.5, 0.8, 0.0), Vector3(0.0, 0.0, -0.2), TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.4, 1.0, 2.5), Vector3(-3.0, 1.10, 0.0), Vector3(0.0, 0.0, 0.5), TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.7, Vector3(0.0, 2.32, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.45, Vector3(-2.0, 1.35, z * 1.31)))
+	parts.append(_star_plate(star, 0.5, Vector3(-3.82, 1.1, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# fartuchy gumowe w panelach, błotniki, beczki
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(6.4, 0.10, 0.75), Vector3(0.0, 1.32, s * 1.3), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		for seg in range(4):
+			parts.append(_part_box(Vector3(1.62, 0.34, 0.13),
+				Vector3(2.4 - float(seg) * 1.66, 1.16, s * 1.34), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+		for seg in range(3):
+			parts.append(_part_box(Vector3(2.15, 0.10, 0.75), Vector3(2.1 - float(seg) * 2.2, 1.32, s * 1.3), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		parts.append(_part_cyl(0.30, 0.30, 1.0, 14, Vector3(-3.75, 1.55, s * 0.6), Vector3(0.0, 0.0, -PI * 0.5), TONE_WHEEL, "armor", Vector3(1.5, 1.0, 1.0)))
+		parts.append(_part_box(Vector3(0.1, 0.12, 0.66), Vector3(-3.75, 1.82, s * 0.6), Vector3.ZERO, TONE_METAL, ""))
 		parts.append(_part_box(Vector3(1.0, 0.45, 0.13), Vector3(2.7, 1.06, s * 1.3), Vector3.ZERO, TONE_DEEP, "armor"))
 		parts.append(_part_box(Vector3(0.9, 0.45, 0.13), Vector3(-3.0, 1.06, s * 1.3), Vector3.ZERO, TONE_DEEP, "armor"))
-	# wieża: niska kopuła z klinami pancerza i rurą do brodzenia
+		_add_bolt_row(parts, Vector3(3.1, 1.06, s * 1.42), Vector3(-0.34, 0.0, 0.0), 10)
+		_add_cable_run(parts, Vector3(3.1, 1.38, s * 1.38), Vector3(-1.9, 1.38, s * 1.38), 8)
+		_add_tool_row(parts, Vector3(0.5, 1.4, s * 1.3), Vector3.ZERO, true)
+	for s in [-1.0, 1.0]:
+		_add_grille(parts, Vector3(-1.3, 1.69, s * 0.72), 1.55, 1.05, 8)
+	# wydech na lewym błotniku tylnym
+	parts.append(_part_cyl(0.13, 0.13, 0.6, 10, Vector3(-2.45, 1.28, 1.38), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_box(Vector3(0.7, 0.2, 0.3), Vector3(-2.45, 1.38, 1.38), Vector3.ZERO, TONE_DEEP, "armor"))
+	_add_periscope(parts, Vector3(3.05, 1.66, -0.55))
+	_add_periscope(parts, Vector3(3.05, 1.66, 0.55))
+	for s in [-1.0, 1.0]:
+		_add_light(parts, Vector3(3.25, 1.4, s * 0.85), s)
+	# wieża: niska kopuła z klinami, działo 125 mm, rura do brodzenia
 	parts.append(_part_sphere(1.28, 0.78, 24, 10, true, Vector3(0.0, 1.52, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(1.32, 1.34, 0.15, 18, Vector3(0.0, 1.53, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	for s in [-1.0, 1.0]:
 		parts.append(_part_box(Vector3(0.9, 0.5, 0.55), Vector3(0.55, 1.72, s * 0.72), Vector3(0.0, 0.0, -0.35), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_cyl(0.44, 0.44, 0.7, 16, Vector3(1.3, 1.95, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
@@ -881,108 +1197,193 @@ func _t72_parts(def_id: String) -> Array:
 	parts.append(_part_cyl(0.19, 0.19, 0.6, 12, Vector3(4.6, 1.95, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.13, 0.13, 0.3, 12, Vector3(5.5, 1.95, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_cyl(0.15, 0.15, 1.3, 10, Vector3(-1.5, 2.05, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.32, 0.32, 0.26, 14, Vector3(-0.3, 2.22, 0.5), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(1.0, 0.12, 0.18), Vector3(-1.5, 1.9, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	_add_cupola(parts, Vector3(-0.3, 2.22, 0.5), 0.32)
 	parts.append(_part_cyl(0.28, 0.28, 0.22, 14, Vector3(0.35, 2.2, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(0.3, 0.24, 0.26), Vector3(-0.3, 2.4, 0.5), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.05, 0.05, 0.8, 8, Vector3(-0.3, 2.5, 0.9), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	for smoke in range(6):
-		var sd: float = 1.0 if smoke % 2 == 0 else -1.0
-		var row: int = smoke >> 1
-		parts.append(_part_cyl(0.06, 0.06, 0.22, 6,
-			Vector3(0.9 - float(row) * 0.2, 1.95, sd * 1.0), Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.3, 0.24, 0.26), Vector3(0.35, 2.38, -0.5), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 0.9, 1.95, 1.0, 1.0, 3)
+	_add_smoke_bank(parts, 0.9, 1.95, -1.0, -1.0, 3)
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.02, 0.02, 1.7, 4, Vector3(-0.8, 2.7, s * 0.8), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_cyl(0.13, 0.13, 0.18, 12, Vector3(3.2, 1.4, s * 0.85), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.26, 0.3), Vector3(3.25, 1.52, s * 0.85), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.30, 0.30, 1.0, 14, Vector3(-3.7, 1.55, s * 0.6), Vector3(0.0, 0.0, -PI * 0.5), TONE_WHEEL, "armor", Vector3(1.5, 1.0, 1.0)))
-		parts.append(_part_box(Vector3(0.1, 0.12, 0.66), Vector3(-3.7, 1.82, s * 0.6), Vector3.ZERO, TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(3.7, 0.7, s * 0.95), Vector3.ZERO, TONE_METAL, ""))
-	# wydech na lewym przednim błotniku (znak rozpoznawczy T-72)
-	parts.append(_part_cyl(0.13, 0.13, 0.6, 10, Vector3(2.3, 1.25, 1.35), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.7, 0.2, 0.3), Vector3(2.3, 1.35, 1.35), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_box(Vector3(1.0, 0.08, 0.15), Vector3(-1.0, 1.34, 1.2), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.035, 0.035, 3.0, 6, Vector3(0.5, 1.34, 1.22), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		_add_antenna(parts, Vector3(-0.8, 2.42, s * 0.8), 1.7)
+		_add_rail(parts, Vector3(1.05, 2.12, s * 1.16), Vector3(-1.15, 2.06, s * 1.16), 3)
+		for link in range(5):
+			parts.append(_part_box(Vector3(0.2, 0.07, 0.54),
+				Vector3(0.3 - float(link) * 0.25, 2.02, s * 1.2), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie: sześć kół, napęd z tyłu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.3, 6, 0.375, 0.58, 3.5, 3.2, -3.3, 0.04, 1.0, 3, false, 0.40, 0.34)
-	var per_belt: int = maxi(12, (ARMOR_PARTS - parts.size()) >> 1)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.3, 0.58, 3.2, -3.3, 0.04, 1.0)
-	return _fit_parts(parts, ARMOR_PARTS, Vector3(2.45, 1.68, -1.05), Vector3(-0.24, 0.07, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.45, 1.68, -1.05), Vector3(-0.24, 0.07, 0.0), "links")
 
 
+## Obiekt 775: radziecki czołg rakietowy z 1964 roku na podwoziu T-64 —
+## kadłub 6,1 m, sześć małych kół, a nad nim płaska, owalna wieża-dysk
+## szersza od kadłuba z cienkim działem 125 mm D-126. Wysokość 1,8 m!
+## Z przodu złożony lemiesz, po bokach fartuchy zasłaniające gąsienice.
+func _obj775_parts(def_id: String) -> Array:
+	var parts: Array = []
+	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
+	# kadłub: niski i szeroki, z sponsonami
+	parts.append(_part_box(Vector3(5.6, 0.5, 2.6), Vector3(0.0, 0.62, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.1, 0.42, 2.75), Vector3(0.0, 1.02, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(6.0, 0.12, 2.9), Vector3(0.0, 1.28, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(2.2, 0.12, 2.9), Vector3(2.65, 0.98, 0.0), Vector3(0.0, 0.0, -0.62), TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.9, 0.45, 2.7), Vector3(3.05, 0.72, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.1, 0.8, 2.7), Vector3(-2.75, 0.95, 0.0), Vector3(0.0, 0.0, 0.45), TONE_DARK, "armor", HULL_UV))
+	# lemiesz do spychania ziemi (składany na glacis)
+	parts.append(_part_box(Vector3(0.18, 0.62, 2.75), Vector3(3.45, 0.85, 0.0), Vector3(0.0, 0.0, -0.55), TONE_DEEP, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.12, 0.5, 2.75), Vector3(3.62, 0.62, 0.0), Vector3(0.0, 0.0, -0.55), TONE_DARK, "armor"))
+	for s in [-1.0, 1.0]:
+		parts.append(_part_box(Vector3(0.7, 0.14, 0.14), Vector3(3.1, 1.12, s * 0.95), Vector3(0.0, 0.0, -0.4), TONE_METAL, ""))
+	parts.append(_star_plate(star, 0.65, Vector3(-0.35, 1.4, 0.0), Vector3.ZERO, true))
+	for z in [-1.0, 1.0]:
+		parts.append(_star_plate(star, 0.42, Vector3(-1.9, 1.02, z * 1.42)))
+	parts.append(_star_plate(star, 0.5, Vector3(-3.32, 0.95, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# fartuchy zasłaniające gąsienice (znak rozpoznawczy Obiektu 775)
+	for s in [-1.0, 1.0]:
+		for seg in range(5):
+			parts.append(_part_box(Vector3(1.18, 0.42, 0.12),
+				Vector3(2.4 - float(seg) * 1.24, 0.98, s * 1.5), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+		for seg in range(3):
+			parts.append(_part_box(Vector3(1.95, 0.10, 0.72), Vector3(1.95 - float(seg) * 2.0, 1.22, s * 1.46), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		_add_bolt_row(parts, Vector3(2.8, 0.86, s * 1.58), Vector3(-0.3, 0.0, 0.0), 9)
+		_add_cable_run(parts, Vector3(2.7, 1.16, s * 1.52), Vector3(-1.7, 1.16, s * 1.52), 7)
+		_add_stowage_box(parts, Vector3(0.8, 0.36, 0.55), Vector3(-1.9, 1.32, s * 1.0))
+	for s in [-1.0, 1.0]:
+		_add_grille(parts, Vector3(-1.2, 1.37, s * 0.72), 1.35, 1.0, 8)
+		parts.append(_part_cyl(0.11, 0.11, 0.42, 10, Vector3(-2.3, 1.1, s * 1.15), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	_add_periscope(parts, Vector3(2.7, 1.36, -0.5))
+	_add_periscope(parts, Vector3(2.7, 1.36, 0.5))
+	for s in [-1.0, 1.0]:
+		_add_light(parts, Vector3(2.95, 1.15, s * 0.95), s, 0.12)
+	# wieża-dysk: szeroki, płaski owal (dwa walce + środek), działa 125 mm
+	parts.append(_part_cyl(1.72, 1.78, 0.42, 22, Vector3(0.15, 1.52, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(1.35, 1.42, 0.14, 18, Vector3(0.15, 1.78, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(1.5, 0.3, 2.4), Vector3(0.15, 1.52, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(0.62, 0.68, 0.3, 14, Vector3(-0.35, 1.86, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_box(Vector3(0.75, 0.22, 0.62), Vector3(0.75, 1.86, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
+	# jarzmo i cienkie działo-pocisk rakietowy Rubin
+	parts.append(_part_cyl(0.3, 0.3, 0.55, 14, Vector3(1.75, 1.62, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_BODY, "armor"))
+	parts.append(_part_cyl(0.085, 0.095, 3.9, 12, Vector3(3.85, 1.62, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor", Vector3(3.0, 1.0, 1.0)))
+	parts.append(_part_cyl(0.13, 0.13, 0.9, 10, Vector3(2.85, 1.62, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.105, 0.105, 0.26, 10, Vector3(5.85, 1.62, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	# włazy załogi, przyrządy obserwacyjne, celownik
+	parts.append(_part_cyl(0.3, 0.3, 0.16, 12, Vector3(-0.55, 1.98, 0.55), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.32, 0.1, 0.28), Vector3(-0.55, 2.08, 0.55), Vector3.ZERO, TONE_DARK, "armor"))
+	parts.append(_part_cyl(0.26, 0.26, 0.14, 12, Vector3(-0.25, 1.98, -0.6), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.22, 0.22, 0.22), Vector3(0.35, 1.98, -0.42), Vector3.ZERO, TONE_METAL, ""))
+	_add_smoke_bank(parts, 0.55, 1.78, 1.24, 1.0, 3)
+	_add_smoke_bank(parts, 0.55, 1.78, -1.24, -1.0, 3)
+	for s in [-1.0, 1.0]:
+		_add_antenna(parts, Vector3(-1.05, 1.86, s * 0.92), 1.5)
+		_add_rail(parts, Vector3(1.15, 1.72, s * 1.5), Vector3(-1.15, 1.72, s * 1.5), 3)
+		for link in range(5):
+			parts.append(_part_box(Vector3(0.19, 0.07, 0.5),
+				Vector3(0.2 - float(link) * 0.24, 1.66, s * 1.52), Vector3(0.0, 0.0, -0.72),
+				TONE_TRACK, "track", TRACK_UV, false))
+	# podwozie T-64: sześć małych kół, napęd z tyłu
+	for s in [-1.0, 1.0]:
+		_add_running_gear(parts, s * 1.34, 6, 0.31, 0.52, 3.3, 3.05, -3.05, 0.06, 0.92, 3, false, 0.34, 0.3)
+	var per_belt: int = maxi(30, (VEHICLE_PARTS - parts.size() - 24) >> 1)
+	for s in [-1.0, 1.0]:
+		_add_track_links(parts, per_belt, s * 1.34, 0.52, 3.05, -3.05, 0.06, 0.92)
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.1, 1.4, -1.15), Vector3(-0.22, 0.07, 0.0), "links")
 # --- wozy bojowe --------------------------------------------------------------
 
 
-## Sylwetka wozu bojowego: 128 brył, kształt zależny od jednostki.
+## Sylwetka wozu bojowego: 1024 bryły, kształt zależny od jednostki.
 func _mech_parts(def_id: String) -> Array:
-	var side: String = _side_of(def_id)
-	var shape: String = str(MECH_SHAPES.get(def_id, "m113" if side == "us" else "mtlb"))
+	var shape: String = str(MECH_SHAPES.get(def_id, "m113"))
 	match shape:
 		"btr60":
 			return _btr60_parts(def_id)
 		"bmp1":
 			return _bmp1_parts(def_id)
-		"m577":
+		"mtlb", "mtu":
+			return _mtlb_parts(def_id, shape == "mtu")
+		"m60cev":
+			return _m60a1_parts(def_id, true)
+		"m113tow":
 			return _m113_parts(def_id, true)
-		"mtlb":
-			return _mtlb_parts(def_id)
 		_:
 			return _m113_parts(def_id, false)
 
 
-## M113 / M577: aluminiowe pudełko ze ściętym przodem, pięć kół, napęd z przodu,
-## brak rolek podtrzymujących i falochron na glacis.
-func _m113_parts(def_id: String, command: bool) -> Array:
+## M113: aluminiowe pudełko ze ściętym przodem, pięć kół, napęd z przodu,
+## brak rolek podtrzymujących i falochron na glacis. Wariant TOW dostaje
+## wyrzutnię pocisków kierowanych na dachu.
+func _m113_parts(def_id: String, tow: bool) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
+	# kadłub: wanna, burty, pokład, skosy, rufa z rampą
 	parts.append(_part_box(Vector3(4.1, 0.6, 2.2), Vector3(0.0, 0.78, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(4.4, 0.6, 2.3), Vector3(0.0, 1.44, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(4.35, 0.12, 2.35), Vector3(0.0, 1.80, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.7, 0.12, 2.35), Vector3(1.55, 1.55, 0.0), Vector3(0.0, 0.0, -0.62), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(0.9, 0.6, 2.2), Vector3(1.95, 1.1, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	parts.append(_part_box(Vector3(1.6, 0.1, 2.2), Vector3(1.8, 1.95, 0.0), Vector3(0.0, 0.0, -0.4), TONE_DEEP, "armor"))
 	parts.append(_part_box(Vector3(1.3, 1.1, 2.2), Vector3(-2.05, 1.1, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
+	parts.append(_part_box(Vector3(1.15, 0.95, 2.05), Vector3(-2.15, 1.02, 0.0), Vector3(0.0, 0.0, -0.12), TONE_DEEP, "armor", HULL_UV))
 	parts.append(_star_plate(star, 0.7, Vector3(-0.4, 1.9, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.45, Vector3(-0.4, 1.44, z * 1.19)))
 	parts.append(_star_plate(star, 0.5, Vector3(-2.71, 1.1, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# falochron, błotniki w segmentach, uchwyty
+	parts.append(_part_box(Vector3(1.6, 0.1, 2.2), Vector3(1.8, 1.95, 0.0), Vector3(0.0, 0.0, -0.4), TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(1.35, 0.08, 1.9), Vector3(2.35, 1.72, 0.0), Vector3(0.0, 0.0, -0.4), TONE_DARK, "armor"))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(4.0, 0.10, 0.8), Vector3(0.0, 1.5, s * 1.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		for seg in range(2):
+			parts.append(_part_box(Vector3(2.05, 0.10, 0.8), Vector3(1.05 - float(seg) * 2.15, 1.5, s * 1.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 		parts.append(_part_box(Vector3(0.9, 0.4, 0.13), Vector3(1.95, 1.2, s * 1.0), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_bolt_row(parts, Vector3(1.75, 1.36, s * 1.16), Vector3(-0.3, 0.0, 0.0), 7)
+		_add_bolt_row(parts, Vector3(1.6, 1.22, s * 1.16), Vector3(-0.3, 0.0, 0.0), 6)
+		_add_cable_run(parts, Vector3(1.7, 1.58, s * 1.12), Vector3(-1.5, 1.58, s * 1.12), 6)
+		_add_tool_row(parts, Vector3(-0.1, 1.62, s * 1.05), Vector3.ZERO, true)
+		_add_stowage_box(parts, Vector3(0.7, 0.4, 0.6), Vector3(-2.5, 1.6, s * 0.7))
 	# wieżyczka dowódcy z tarczą km-u (charakterystyczna dla M113)
 	parts.append(_part_cyl(0.42, 0.46, 0.34, 16, Vector3(0.4, 2.0, 0.55), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(0.36, 0.36, 0.1, 12, Vector3(0.4, 2.22, 0.55), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_box(Vector3(0.6, 0.45, 0.08), Vector3(1.05, 2.03, 0.55), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_box(Vector3(0.26, 0.22, 0.24), Vector3(1.2, 2.25, 0.55), Vector3.ZERO, TONE_METAL, ""))
 	parts.append(_part_cyl(0.05, 0.05, 0.9, 8, Vector3(1.2, 2.35, 1.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_cyl(0.36, 0.36, 0.26, 14, Vector3(-0.5, 1.95, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_box(Vector3(0.5, 0.14, 0.5), Vector3(-1.3, 1.9, 0.4), Vector3.ZERO, TONE_DEEP, "armor"))
-	if command:
-		# M577: wyższa nadbudówka dowodzenia zamiast przedziału desantowego
-		parts.append(_part_box(Vector3(3.2, 0.75, 2.1), Vector3(-0.6, 2.24, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
-		parts.append(_part_box(Vector3(3.0, 0.1, 2.0), Vector3(-0.6, 2.68, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	parts.append(_part_box(Vector3(0.42, 0.12, 0.42), Vector3(-1.3, 2.0, 0.4), Vector3.ZERO, TONE_DARK, "armor"))
+	if tow:
+		# M113 TOW: dwururowa wyrzutnia na obrotnicy
+		parts.append(_part_cyl(0.3, 0.34, 0.22, 12, Vector3(-0.75, 2.02, -0.55), Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_box(Vector3(0.85, 0.3, 0.34), Vector3(-0.75, 2.3, -0.55), Vector3.ZERO, TONE_BODY, "armor"))
+		for s2 in [-1.0, 1.0]:
+			parts.append(_part_cyl(0.11, 0.11, 1.05, 10, Vector3(-0.25, 2.3, -0.55 + s2 * 0.12), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
+			parts.append(_part_cyl(0.13, 0.13, 0.12, 10, Vector3(0.32, 2.3, -0.55 + s2 * 0.12), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+		parts.append(_part_box(Vector3(0.22, 0.22, 0.22), Vector3(-0.75, 2.52, -0.55), Vector3.ZERO, TONE_METAL, ""))
+	# włazy, peryskopy, reflektory, anteny
+	_add_periscope(parts, Vector3(1.55, 1.92, -0.55))
+	_add_periscope(parts, Vector3(1.55, 1.92, 0.55))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.12, 0.12, 0.16, 12, Vector3(2.2, 1.55, s * 0.8), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.22, 0.28), Vector3(2.3, 1.65, s * 0.8), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.7, 0.4, 0.6), Vector3(-2.5, 1.6, s * 0.7), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.02, 0.02, 1.3, 4, Vector3(-1.3, 2.4, s * 0.75), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_box(Vector3(0.2, 0.12, 0.1), Vector3(2.45, 0.7, s * 0.85), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.03, 0.03, 2.0, 6, Vector3(-0.5, 1.52, 1.05), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.9, 0.08, 0.14), Vector3(-1.4, 1.54, 1.0), Vector3.ZERO, TONE_DEEP, "armor"))
-	# gąsienice: pięć kół, bez rolek, napęd z przodu
+		_add_light(parts, Vector3(2.2, 1.55, s * 0.8), s, 0.12)
+		_add_antenna(parts, Vector3(-1.3, 2.4, s * 0.75), 1.3)
+		_add_rail(parts, Vector3(1.2, 1.88, s * 1.08), Vector3(-1.6, 1.88, s * 1.08), 3)
+	parts.append(_part_box(Vector3(0.9, 0.08, 0.14), Vector3(-1.4, 1.62, 1.05), Vector3.ZERO, TONE_DEEP, "armor"))
+	# podwozie: pięć kół, bez rolek, napęd z przodu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.0, 5, 0.32, 0.5, 2.6, 2.05, -2.05, 0.06, 1.0, 0, true, 0.36, 0.32)
-	var per_belt: int = maxi(10, (MECH_PARTS - parts.size()) >> 1)
+	var per_belt: int = 72
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.0, 0.5, 2.05, -2.05, 0.06, 1.0)
-	return _fit_parts(parts, MECH_PARTS, Vector3(1.6, 1.7, -1.0), Vector3(-0.2, 0.06, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(1.6, 1.42, -1.0), Vector3(-0.2, 0.075, 0.0), "links")
 
 
 ## BTR-60PB: ośmiokołowy wóz bojowy — łódkowy kadłub, cztery osie i mała
-## stożkowa wieżyczka z km-em 14,5 mm na przodzie.
+## stożkowa wieżyczka z km-em 14,5 mm na przodzie. Wypełnienie: łby śrub.
 func _btr60_parts(def_id: String) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
 	# kadłub łódkowy: wąskie dno, szersza góra („skrzydła mewy”)
 	parts.append(_part_box(Vector3(6.6, 0.4, 1.8), Vector3(0.0, 0.55, 0.0), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(7.2, 0.6, 2.4), Vector3(0.0, 1.0, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
@@ -991,39 +1392,43 @@ func _btr60_parts(def_id: String) -> Array:
 	parts.append(_part_box(Vector3(1.9, 0.14, 2.7), Vector3(2.95, 1.2, 0.0), Vector3(0.0, 0.0, -0.85), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.8, 0.1, 2.2), Vector3(3.3, 1.5, 0.0), Vector3(0.0, 0.0, -0.5), TONE_DEEP, "armor"))
 	parts.append(_part_box(Vector3(1.0, 1.1, 2.4), Vector3(-3.4, 1.2, 0.0), Vector3(0.0, 0.0, 0.4), TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.6, Vector3(-1.2, 1.80, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.45, Vector3(-1.2, 1.45, z * 1.39)))
 	parts.append(_star_plate(star, 0.5, Vector3(-4.0, 1.2, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# falochron, półki, klamry, uchwyty
 	for s in [-1.0, 1.0]:
 		parts.append(_part_box(Vector3(6.4, 0.1, 0.55), Vector3(-0.2, 1.55, s * 1.42), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(0.9, 0.4, 0.13), Vector3(2.95, 1.22, s * 1.42), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_bolt_row(parts, Vector3(2.9, 1.32, s * 1.52), Vector3(-0.32, 0.0, 0.0), 10)
+		_add_bolt_row(parts, Vector3(2.75, 1.18, s * 1.52), Vector3(-0.32, 0.0, 0.0), 9)
+		_add_bolt_row(parts, Vector3(2.6, 0.88, s * 1.18), Vector3(-0.32, 0.0, 0.0), 8)
+		_add_cable_run(parts, Vector3(2.9, 1.5, s * 1.5), Vector3(-2.2, 1.5, s * 1.5), 8)
+		_add_tool_row(parts, Vector3(0.4, 1.58, s * 1.35), Vector3.ZERO, true)
+		_add_stowage_box(parts, Vector3(0.6, 0.3, 0.5), Vector3(-3.6, 1.7, s * 0.8))
 	# wieżyczka z km-em 14,5 mm (BTR-60PB)
 	parts.append(_part_cyl(0.42, 0.55, 0.45, 16, Vector3(1.2, 1.95, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_cyl(0.34, 0.34, 0.1, 14, Vector3(1.2, 2.2, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.07, 0.08, 1.3, 12, Vector3(2.3, 1.95, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.1, 0.1, 0.24, 12, Vector3(3.0, 1.95, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_cyl(0.05, 0.05, 0.7, 8, Vector3(2.0, 1.85, 0.32), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	# włazy, peryskopy, reflektory, anteny, narzędzia
-	parts.append(_part_cyl(0.22, 0.22, 0.16, 12, Vector3(2.05, 1.86, -0.55), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.22, 0.22, 0.16, 12, Vector3(0.0, 1.86, 0.9), Vector3.ZERO, TONE_DEEP, "armor"))
-	parts.append(_part_cyl(0.22, 0.22, 0.16, 12, Vector3(-2.2, 1.86, 0.6), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.26, 0.22, 0.26), Vector3(1.2, 2.36, 0.0), Vector3.ZERO, TONE_METAL, ""))
+	# włazy, peryskopy, reflektory, anteny
+	for pos in [Vector3(2.05, 1.86, -0.55), Vector3(0.0, 1.86, 0.9), Vector3(-2.2, 1.86, 0.6), Vector3(-2.2, 1.86, -0.6)]:
+		parts.append(_part_cyl(0.22, 0.22, 0.16, 12, pos, Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_box(Vector3(0.28, 0.08, 0.28), pos + Vector3(0.0, 0.12, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	_add_periscope(parts, Vector3(3.15, 1.52, -0.72))
+	_add_periscope(parts, Vector3(3.15, 1.52, 0.72))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.12, 0.12, 0.16, 12, Vector3(3.25, 1.3, s * 0.75), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.22, 0.28), Vector3(3.3, 1.42, s * 0.75), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.02, 0.02, 1.3, 4, Vector3(-2.0, 2.5, s * 1.0), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_box(Vector3(0.6, 0.3, 0.5), Vector3(-3.6, 1.7, s * 0.8), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(3.6, 0.62, s * 1.0), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.03, 0.03, 2.2, 6, Vector3(-0.4, 1.6, 1.4), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.9, 0.08, 0.14), Vector3(-1.4, 1.62, 1.35), Vector3.ZERO, TONE_DEEP, "armor"))
-	# cztery osie na stronę: dwie pary blisko siebie, w środku przerwa
+		_add_light(parts, Vector3(3.25, 1.3, s * 0.75), s, 0.12)
+		_add_antenna(parts, Vector3(-2.0, 2.2, s * 1.0), 1.3)
+		_add_rail(parts, Vector3(1.6, 1.78, s * 1.32), Vector3(-1.8, 1.78, s * 1.32), 3)
+	# śruby mocowania kół i osłony
 	for s in [-1.0, 1.0]:
 		for x in [2.85, 1.45, -1.35, -2.75]:
-			_add_vehicle_wheel(parts, x, s * 1.35, 0.62, 0.42)
-			# wahacz zawieszenia i pierścień śrub na piaście (BTR ma 8 kół)
+			_add_vehicle_wheel(parts, x, s * 1.35, 0.62, 0.42, 14)
 			parts.append(_part_box(Vector3(0.9, 0.16, 0.14), Vector3(x - 0.35, 0.85, s * 1.2), Vector3.ZERO, TONE_DEEP, "armor", PLAIN_UV, false))
-			parts.append(_part_cyl(0.34, 0.34, 0.5, 12, Vector3(x, 0.66, s * 1.35), Vector3(PI * 0.5, 0.0, 0.0), TONE_WHEEL, "track", PLAIN_UV, false))
-	return _fit_parts(parts, MECH_PARTS, Vector3(1.6, 1.32, 1.44), Vector3(-0.28, 0.1, 0.0), "bolts")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(1.6, 1.32, 1.44), Vector3(-0.28, 0.1, 0.0), "bolts")
 
 
 ## BMP-1: bardzo niska, ostro ścięta sylwetka, sześć kół, napęd z przodu,
@@ -1031,20 +1436,28 @@ func _btr60_parts(def_id: String) -> Array:
 func _bmp1_parts(def_id: String) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
+	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_part_box(Vector3(5.6, 0.45, 2.2), Vector3(0.0, 0.68, 0.0), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.1, 0.5, 2.4), Vector3(0.0, 1.2, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(5.9, 0.12, 2.45), Vector3(0.0, 1.52, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(2.8, 0.12, 2.45), Vector3(2.4, 1.1, 0.0), Vector3(0.0, 0.0, -1.0), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(0.8, 0.4, 2.3), Vector3(2.85, 0.72, 0.0), Vector3(0.0, 0.0, -0.4), TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.2, 1.0, 2.3), Vector3(-2.6, 1.15, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.6, Vector3(-0.9, 1.60, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.42, Vector3(-0.9, 1.2, z * 1.24)))
 	parts.append(_star_plate(star, 0.45, Vector3(-3.22, 1.15, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
+	# błotniki, uchwyty, skrzynie, drzwi desantowe z okienkami
 	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(5.6, 0.10, 0.75), Vector3(0.0, 1.42, s * 1.15), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		for seg in range(2):
+			parts.append(_part_box(Vector3(2.85, 0.10, 0.75), Vector3(1.4 - float(seg) * 2.9, 1.42, s * 1.15), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 		parts.append(_part_box(Vector3(0.9, 0.4, 0.13), Vector3(2.6, 1.18, s * 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
+		parts.append(_part_box(Vector3(1.0, 0.22, 0.1), Vector3(-2.65, 1.28, s * 0.72), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_bolt_row(parts, Vector3(2.5, 1.3, s * 1.25), Vector3(-0.3, 0.0, 0.0), 8)
+		_add_bolt_row(parts, Vector3(2.35, 1.16, s * 1.25), Vector3(-0.3, 0.0, 0.0), 7)
+		_add_cable_run(parts, Vector3(2.5, 1.48, s * 1.2), Vector3(-1.6, 1.48, s * 1.2), 7)
+		_add_tool_row(parts, Vector3(-0.2, 1.5, s * 1.1), Vector3.ZERO, true)
+		_add_stowage_box(parts, Vector3(0.65, 0.35, 0.55), Vector3(-2.85, 1.55, s * 0.78))
 	# wieżyczka z działkiem 73 mm i wyrzutnią 9M14 na dachu
 	parts.append(_part_cyl(0.5, 0.6, 0.42, 16, Vector3(0.9, 1.78, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_cyl(0.52, 0.52, 0.08, 14, Vector3(0.9, 2.05, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
@@ -1052,92 +1465,108 @@ func _bmp1_parts(def_id: String) -> Array:
 	parts.append(_part_cyl(0.14, 0.14, 0.2, 12, Vector3(3.0, 1.8, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_box(Vector3(1.1, 0.12, 0.16), Vector3(1.35, 2.18, 0.0), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.07, 0.07, 0.9, 10, Vector3(1.9, 2.22, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_part_cyl(0.085, 0.085, 0.22, 10, Vector3(2.42, 2.22, 0.0), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_cyl(0.3, 0.3, 0.2, 14, Vector3(0.35, 1.95, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.3, 0.3, 0.2, 14, Vector3(-0.5, 1.85, 0.55), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.3, 0.1, 0.3), Vector3(0.35, 2.08, -0.5), Vector3.ZERO, TONE_DARK, "armor"))
+	_add_smoke_bank(parts, 0.55, 1.95, 0.95, 1.0, 3)
+	_add_smoke_bank(parts, 0.55, 1.95, -0.95, -1.0, 3)
+	_add_periscope(parts, Vector3(2.85, 1.52, -0.6))
+	_add_periscope(parts, Vector3(2.85, 1.52, 0.6))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.12, 0.12, 0.16, 12, Vector3(2.75, 1.38, s * 0.8), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.22, 0.28), Vector3(2.8, 1.5, s * 0.8), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.02, 0.02, 1.3, 4, Vector3(-1.4, 2.3, s * 0.8), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(3.0, 0.6, s * 0.95), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.03, 0.03, 2.2, 6, Vector3(-0.3, 1.45, 1.1), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.8, 0.08, 0.14), Vector3(-1.3, 1.47, 1.05), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_light(parts, Vector3(2.75, 1.38, s * 0.8), s, 0.12)
+		_add_antenna(parts, Vector3(-1.4, 2.05, s * 0.8), 1.3)
+		_add_rail(parts, Vector3(1.3, 1.68, s * 1.12), Vector3(-1.9, 1.68, s * 1.12), 3)
+	parts.append(_part_box(Vector3(0.8, 0.08, 0.14), Vector3(-1.3, 1.55, 1.1), Vector3.ZERO, TONE_DEEP, "armor"))
+	# podwozie: sześć kół, napęd z przodu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.15, 6, 0.30, 0.48, 2.8, 2.6, -2.6, 0.06, 0.92, 3, true, 0.32, 0.30)
-	var per_belt: int = maxi(10, (MECH_PARTS - parts.size()) >> 1)
+	var per_belt: int = 72
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.15, 0.48, 2.6, -2.6, 0.06, 0.92)
-	return _fit_parts(parts, MECH_PARTS, Vector3(2.3, 1.68, -1.0), Vector3(-0.22, 0.06, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.3, 1.6, -1.0), Vector3(-0.22, 0.075, 0.0), "links")
 
 
 ## MT-LB: bardzo niski ciągnik opancerzony — sześć kół, brak rolek, mała
 ## wieżyczka z km-em na przedzie. MTU-20 nosi na dachu składany most.
-func _mtlb_parts(def_id: String) -> Array:
+func _mtlb_parts(def_id: String, bridgelayer: bool) -> Array:
 	var parts: Array = []
 	var side: String = _side_of(def_id)
-	var bridgelayer: bool = def_id == "su_eng_mtu"
+	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_part_box(Vector3(5.8, 0.4, 2.2), Vector3(0.0, 0.62, 0.0), Vector3.ZERO, TONE_DEEP, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(6.1, 0.45, 2.35), Vector3(0.0, 1.1, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(5.9, 0.12, 2.4), Vector3(0.0, 1.42, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.5, 0.1, 2.4), Vector3(2.7, 1.2, 0.0), Vector3(0.0, 0.0, -0.5), TONE_BODY, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(0.7, 0.5, 2.3), Vector3(2.95, 0.8, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
 	parts.append(_part_box(Vector3(1.1, 0.9, 2.3), Vector3(-2.6, 1.05, 0.0), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-	var star: String = "star_su" if side == "su" else "star_us"
 	parts.append(_star_plate(star, 0.55, Vector3(-1.0, 1.50, 0.0), Vector3.ZERO, true))
 	for z in [-1.0, 1.0]:
 		parts.append(_star_plate(star, 0.4, Vector3(-1.0, 1.1, z * 1.19)))
-	for s in [-1.0, 1.0]:
-		parts.append(_part_box(Vector3(5.7, 0.1, 0.7), Vector3(0.0, 1.3, s * 1.15), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
-		parts.append(_part_box(Vector3(0.8, 0.36, 0.13), Vector3(2.6, 1.08, s * 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
-	# mała wieżyczka z km-em
-	parts.append(_part_cyl(0.26, 0.32, 0.28, 14, Vector3(1.5, 1.62, 0.45), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
-	parts.append(_part_cyl(0.05, 0.05, 0.7, 8, Vector3(1.5, 1.78, 0.85), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
+	parts.append(_star_plate(star, 0.45, Vector3(-3.17, 1.05, 0.0), Vector3(0.0, PI * 0.5, 0.0)))
 	if bridgelayer:
-		# MTU-20: most na dachu
+		# MTU-20: składany most na dachu
 		parts.append(_part_box(Vector3(5.4, 0.3, 2.3), Vector3(0.0, 1.7, 0.0), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
 		parts.append(_part_box(Vector3(5.2, 0.12, 0.2), Vector3(0.0, 1.88, 1.05), Vector3.ZERO, TONE_DEEP, "armor"))
 		parts.append(_part_box(Vector3(5.2, 0.12, 0.2), Vector3(0.0, 1.88, -1.05), Vector3.ZERO, TONE_DEEP, "armor"))
+		for seg in range(4):
+			parts.append(_part_box(Vector3(1.15, 0.08, 2.15),
+				Vector3(1.9 - float(seg) * 1.28, 1.87, 0.0), Vector3.ZERO, TONE_DARK, "armor"))
+	for s in [-1.0, 1.0]:
+		for seg in range(2):
+			parts.append(_part_box(Vector3(2.85, 0.1, 0.7), Vector3(1.45 - float(seg) * 2.95, 1.3, s * 1.15), Vector3.ZERO, TONE_DARK, "armor", HULL_UV))
+		parts.append(_part_box(Vector3(0.8, 0.36, 0.13), Vector3(2.6, 1.08, s * 1.15), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_bolt_row(parts, Vector3(2.55, 1.16, s * 1.25), Vector3(-0.3, 0.0, 0.0), 8)
+		_add_bolt_row(parts, Vector3(2.4, 1.02, s * 1.25), Vector3(-0.3, 0.0, 0.0), 7)
+		_add_cable_run(parts, Vector3(2.5, 1.36, s * 1.22), Vector3(-1.7, 1.36, s * 1.22), 7)
+		_add_tool_row(parts, Vector3(-0.15, 1.38, s * 1.1), Vector3.ZERO, true)
+		_add_stowage_box(parts, Vector3(0.6, 0.3, 0.5), Vector3(-2.9, 1.5, s * 0.7))
+	# mała wieżyczka z km-em
+	parts.append(_part_cyl(0.26, 0.32, 0.28, 14, Vector3(1.5, 1.62, 0.45), Vector3.ZERO, TONE_BODY, "armor", HULL_UV))
+	parts.append(_part_cyl(0.22, 0.22, 0.08, 12, Vector3(1.5, 1.8, 0.45), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_cyl(0.05, 0.05, 0.7, 8, Vector3(1.5, 1.78, 0.85), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
 	parts.append(_part_cyl(0.3, 0.3, 0.18, 14, Vector3(-0.4, 1.52, -0.5), Vector3.ZERO, TONE_DEEP, "armor"))
 	parts.append(_part_cyl(0.28, 0.28, 0.18, 14, Vector3(0.5, 1.52, 0.5), Vector3.ZERO, TONE_DEEP, "armor"))
+	parts.append(_part_box(Vector3(0.34, 0.08, 0.34), Vector3(-0.4, 1.65, -0.5), Vector3.ZERO, TONE_DARK, "armor"))
+	_add_periscope(parts, Vector3(2.75, 1.36, -0.55))
+	_add_periscope(parts, Vector3(2.75, 1.36, 0.55))
 	for s in [-1.0, 1.0]:
-		parts.append(_part_cyl(0.12, 0.12, 0.16, 12, Vector3(2.85, 1.25, s * 0.75), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-		parts.append(_part_box(Vector3(0.2, 0.22, 0.28), Vector3(2.9, 1.37, s * 0.75), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_cyl(0.02, 0.02, 1.2, 4, Vector3(-1.6, 2.1, s * 0.8), Vector3.ZERO, TONE_METAL, "", PLAIN_UV, false))
-		parts.append(_part_box(Vector3(0.6, 0.3, 0.5), Vector3(-2.9, 1.5, s * 0.7), Vector3.ZERO, TONE_DEEP, "armor"))
-		parts.append(_part_box(Vector3(0.22, 0.12, 0.1), Vector3(3.15, 0.6, s * 0.9), Vector3.ZERO, TONE_METAL, ""))
-	parts.append(_part_cyl(0.03, 0.03, 2.0, 6, Vector3(-0.2, 1.35, 1.05), Vector3(0.0, 0.0, -PI * 0.5), TONE_METAL, ""))
-	parts.append(_part_box(Vector3(0.7, 0.08, 0.14), Vector3(-1.2, 1.37, 1.0), Vector3.ZERO, TONE_DEEP, "armor"))
+		_add_light(parts, Vector3(2.85, 1.25, s * 0.75), s, 0.12)
+		_add_antenna(parts, Vector3(-1.6, 1.95, s * 0.8), 1.2)
+		_add_rail(parts, Vector3(1.25, 1.52, s * 1.12), Vector3(-1.85, 1.52, s * 1.12), 3)
+	parts.append(_part_box(Vector3(0.7, 0.08, 0.14), Vector3(-1.2, 1.45, 1.05), Vector3.ZERO, TONE_DEEP, "armor"))
+	# podwozie: sześć kół, bez rolek, napęd z przodu
 	for s in [-1.0, 1.0]:
 		_add_running_gear(parts, s * 1.15, 6, 0.32, 0.46, 3.1, 2.9, -2.9, 0.06, 1.0, 0, true, 0.32, 0.32)
-	var per_belt: int = maxi(10, (MECH_PARTS - parts.size()) >> 1)
+	var per_belt: int = 72
 	for s in [-1.0, 1.0]:
 		_add_track_links(parts, per_belt, s * 1.15, 0.46, 2.9, -2.9, 0.06, 1.0)
-	return _fit_parts(parts, MECH_PARTS, Vector3(2.25, 1.55, -1.0), Vector3(-0.22, 0.06, 0.0), "links")
+	return _fit_parts(parts, VEHICLE_PARTS, Vector3(2.25, 1.5, -1.0), Vector3(-0.22, 0.075, 0.0), "links")
 
 
 # --- wyrównanie liczby brył ---------------------------------------------------
 
 
-## Domyka liczbę brył do `target`: brakujące dokłada jako zapasowe ogniwa na
-## pancerzu (`links`) albo uchwyty na obu burtach (`bolts` — dla wozów
-## kołowych), a nadmiar ucina z końca listy (to zawsze ostatnie ogniwa).
+## Domyka liczbę brył do `target`: brakujące dokłada jako zapasowe ogniwa
+## ułożone w siatce na obu burtach (`links`) albo łby śrub / uchwyty
+## (`bolts` — dla wozów kołowych). Siatka zawija się w rzędach i warstwach,
+## więc wypełnienie nie wychodzi poza kadłub; nadmiar ucina z końca listy.
 func _fit_parts(parts: Array, target: int, mount: Vector3 = Vector3.ZERO,
 		pitch: Vector3 = Vector3(-0.24, 0.07, 0.0), kind: String = "links") -> Array:
 	while parts.size() > target:
 		parts.remove_at(parts.size() - 1)
 	var index: int = 0
 	while parts.size() < target:
+		var side_i: int = index % 2
+		var col: int = (index >> 1) % 8
+		var row: int = (index >> 4) % 3
+		var layer: int = index / 48
 		var pos: Vector3 = mount
+		pos.x += pitch.x * float(col) + pitch.x * 0.5 * float(layer % 2)
+		pos.y += pitch.y * float(row) + pitch.y * 3.0 * float((layer >> 1) % 2)
+		pos.z = mount.z if side_i == 0 else -mount.z
 		if kind == "bolts":
-			# Uchwyty idą parami po obu burtach; po ośmiu w rzędzie przechodzą
-			# do następnego rzędu wyżej, więc nie wyłażą poza kadłub.
-			var per_row: int = 8
-			var slot: int = index >> 1
-			var row: int = int(floor(float(slot) / float(per_row)))
-			pos += Vector3(pitch.x * float(slot % per_row), pitch.y * float(row),
-				0.0 if index % 2 == 0 else -2.0 * mount.z)
 			parts.append(_part_box(Vector3(0.16, 0.06, 0.12), pos, Vector3.ZERO, TONE_DEEP, "armor", PLAIN_UV, false))
 		else:
-			pos += Vector3(pitch.x * float(index % 8), pitch.y * float(index >> 3), 0.0)
 			parts.append(_part_box(Vector3(0.2, 0.07, 0.56), pos, Vector3(0.0, 0.0, -0.72),
 				TONE_TRACK, "track", TRACK_UV))
 		index += 1

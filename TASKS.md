@@ -130,6 +130,38 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
       w makiecie (białe USA, czerwone ZSRR) i wybiera wozy po `def_id`
 - [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
 
+### Etap 8 — modele pojazdów w 1024 bryłach (2026-10-19)
+
+Skład parku sprzętu ustalony z użytkownikiem (wzorce: modele 3D na Sketchfabie
++ Wikipedia): wchodzą **MBT-70** i **Obiekt 775**, **T-62 zostaje zamiast T-55**,
+wypadają **M48A5** i **M577**.
+
+- [x] każdy pojazd przebudowany do **1024 brył** (piechur zostaje przy 10):
+      pełna bieżnia z pojedynczych ogniw, koła jezdne z piastami i śrubami,
+      koła napędowe z zębami, napinające ze szprychami, rolki, wahacze,
+      segmentowane błotniki i fartuchy, żaluzje chłodnic, narzędzia, liny
+      holownicze, kanistry, skrzynie, wyrzutnie dymne, poręcze, peryskopy
+- [x] osiem funkcji budujących → **dziesięć**: nowe `_mbt70_parts` (płaska
+      wieża szersza od kadłuba, działo 152 mm, działko 20 mm w kopułce, siedem
+      kół) i `_obj775_parts` (wieża-dysk, działo-pocisk 125 mm Rubin, lemiesz,
+      podwozie T-64, fartuchy na całą długość); `_t54_parts` zastąpione przez
+      `_t62_parts` (równy rozstaw kół, OPVT z modernizacji 1972), z `_patton_parts`
+      wycięto wariant M48A5, z `_m113_parts` wozówkę M577 (został wariant TOW),
+      `_m60a1_parts` obsługuje wariant M728 CEV (lemiesz + żuraw + krótkie działo)
+- [x] `units_data.gd`: nowe `us_proto_mbt70` (prototyp) i `su_proto_775`
+      (prototyp, był `su_proto_775` — zostaje), `su_arm_t62` → „T-62 Obr. 1972",
+      usunięte `us_arm_m48a5`, `us_mech_m577`, `su_arm_t55`; tak samo
+      `battle_sim.gd` (uzbrojenie) i testy
+- [x] `_fit_parts()` przepisane: wypełnienie (zapasy ogniwa / łby śrub) układa
+      się w siatce z zawijaniem warstw na obu burtach, więc nie wychodzi poza
+      kadłub i nie tworzy „ściany" zapasowych ogniw
+- [x] testy: `test_views` pilnuje `VEHICLE_PARTS = 1024` dla obu klas wozów,
+      porównuje sylwetki sześciu czołgów (w tym MBT-70 i Obiekt 775);
+      komplet = 7 testów + 2 sceny PASS, 39 unikalnych materiałów
+- [x] rendery i dokumentacja przeliczone: park 6 czołgów (`render_porownanie`),
+      wozy bojowe, cztery ujęcia M60A1, barwy fabryczne, jednostki w skali,
+      makieta brył; `docs/podglady/README.md` przepisane
+
 ## Naprawione po pierwszym uruchomieniu testów (2026-10-15)
 
 - `map_gen.gd`: `static func _get/_set` kolidowały z wirtualnymi metodami `Object`
@@ -160,9 +192,11 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 4. **Eksport web** — potrzebne szablony eksportu Godota 4.7.2 (nie pobrane).
 5. **Balans** — wartości broni i ekonomii są startowe; wymagają partii testowych.
 6. **Przegląd wizualny** — widoki 2D i 3D sprawdzone tylko bez okna (`--headless`).
-7. **Rozmiar workspace** — binarka Godota (192 MB) leży poza projektem,
-   spakowana do 74 MB w `/home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64.gz`.
+7. **Rozmiar workspace** — binarka Godota (~136 MB) leży poza projektem,
+   spakowana do ~37 MB w `/home/user/tools/godot/Godot_v4.7.2-stable_linux.x86_64.gz`.
    Do repo nie trafia; przed użyciem: `gunzip -k` (patrz README).
+   Budowa ze źródeł wymaga `linkflags="-Wl,--start-group"` (kolejność archiwów
+   w linku) i `disable_path_overrides=no` (obsługa `--path` w szablonie).
 
 ## Uwagi o tej sesji (2026-10-15)
 
@@ -180,8 +214,8 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
 - Liczba testów wzrosła do siedmiu: `test_textures` pilnuje kompletu tekstur,
   a `test_views` składa obie sceny i sprawdza sylwetki jednostek (dokładne
   liczby brył, unikalne proporcje wozów, brak gąsienic w BTR-60PB) oraz HUD.
-  Stan na koniec etapu grafiki: 9 jednostek, `{piechur 10, wóz 128, czołg 256}`
-  brył, 513 brył z teksturą AI, 33 unikalne materiały (limit 64).
+  Stan po etapie 8: 9 jednostek, `{piechur 10, pojazd 1024}` brył,
+  2 781 brył z teksturą AI, 39 unikalnych materiałów (limit 64).
 - Analiza statyczna całego projektu (`@gdscript-analyzer/core` 0.6.1):
   **0 błędów, 0 ostrzeżeń** (pole `seed` w `campaign.gd` zmienione na
   `world_seed`, żeby nie przesłaniało globalnej funkcji `seed()`; klucz w pliku

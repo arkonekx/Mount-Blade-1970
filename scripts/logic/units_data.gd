@@ -21,12 +21,10 @@ const UNIT_DEFS: Array = [
 	{"id": "us_inf_dragon", "side": "us", "cls": CLS_INFANTRY, "name": "Drużyna ppk (M47 Dragon)", "year": 1975, "prototype": false},
 	{"id": "us_mech_m113", "side": "us", "cls": CLS_MECH, "name": "M113 ACAV", "year": 1960, "prototype": false},
 	{"id": "us_mech_m113tow", "side": "us", "cls": CLS_MECH, "name": "M113 TOW", "year": 1970, "prototype": false},
-	{"id": "us_mech_m577", "side": "us", "cls": CLS_MECH, "name": "M577 (dowodzenie)", "year": 1962, "prototype": false},
 	{"id": "us_eng_cev", "side": "us", "cls": CLS_MECH, "name": "M728 CEV (inżynieryjny)", "year": 1965, "prototype": false},
-	{"id": "us_arm_m48a5", "side": "us", "cls": CLS_ARMOR, "name": "M48A5 Patton", "year": 1975, "prototype": false},
 	{"id": "us_arm_m60a1", "side": "us", "cls": CLS_ARMOR, "name": "M60A1", "year": 1962, "prototype": false},
 	{"id": "us_arm_m551", "side": "us", "cls": CLS_ARMOR, "name": "M551 Sheridan", "year": 1966, "prototype": false},
-	{"id": "us_proto_xm803", "side": "us", "cls": CLS_ARMOR, "name": "XM803 (prototyp)", "year": 1970, "prototype": true},
+	{"id": "us_proto_mbt70", "side": "us", "cls": CLS_ARMOR, "name": "MBT-70 (prototyp)", "year": 1970, "prototype": true},
 
 	# --- Siły Zbrojne ZSRR ---
 	{"id": "su_inf_ak", "side": "su", "cls": CLS_INFANTRY, "name": "Piechota (AKM)", "year": 1959, "prototype": false},
@@ -37,8 +35,7 @@ const UNIT_DEFS: Array = [
 	{"id": "su_mech_bmp1", "side": "su", "cls": CLS_MECH, "name": "BMP-1", "year": 1966, "prototype": false},
 	{"id": "su_mech_mtlb", "side": "su", "cls": CLS_MECH, "name": "MT-LB", "year": 1966, "prototype": false},
 	{"id": "su_eng_mtu", "side": "su", "cls": CLS_MECH, "name": "MTU-20 (mostowiec)", "year": 1967, "prototype": false},
-	{"id": "su_arm_t55", "side": "su", "cls": CLS_ARMOR, "name": "T-55", "year": 1958, "prototype": false},
-	{"id": "su_arm_t62", "side": "su", "cls": CLS_ARMOR, "name": "T-62", "year": 1961, "prototype": false},
+	{"id": "su_arm_t62", "side": "su", "cls": CLS_ARMOR, "name": "T-62 Obr. 1972", "year": 1972, "prototype": false},
 	{"id": "su_arm_t72", "side": "su", "cls": CLS_ARMOR, "name": "T-72 Ural", "year": 1973, "prototype": false},
 	{"id": "su_proto_775", "side": "su", "cls": CLS_ARMOR, "name": "Obiekt 775 (prototyp)", "year": 1964, "prototype": true},
 ]

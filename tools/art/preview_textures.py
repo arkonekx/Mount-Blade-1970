@@ -487,10 +487,10 @@ def vehicles_mock(out_dir, meshes_path="/tmp/art/units.json"):
         draw.text((x0 + 3 * ppm, y + 8), "3 m", font=ImageFont.truetype(FONT, 14), fill=DIM2, anchor="ma")
 
     rows = [
-        (380, [(330, "us_arm_m60a1", "czołg NATO — M60A1 (256 brył)"),
-               (1000, "su_arm_t55", "czołg ZSRR — T-55 (256 brył)")]),
-        (665, [(330, "us_mech_m113", "wóz bojowy NATO — M113 (128 brył)"),
-               (1000, "su_mech_bmp1", "wóz bojowy ZSRR — BMP-1 (128 brył)")]),
+        (380, [(330, "us_arm_m60a1", "czołg NATO — M60A1 (1024 bryły)"),
+               (1000, "su_arm_t62", "czołg ZSRR — T-62 Obr. 1972 (1024 bryły)")]),
+        (665, [(330, "us_mech_m113", "wóz bojowy NATO — M113 (1024 bryły)"),
+               (1000, "su_mech_bmp1", "wóz bojowy ZSRR — BMP-1 (1024 bryły)")]),
     ]
     for base_y, entries in rows:
         draw.line([(20, base_y), (w - 20, base_y)], fill=GROUND, width=2)

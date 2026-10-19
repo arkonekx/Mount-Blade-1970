@@ -495,15 +495,16 @@ def main():
     # --- 2. Czołgi obu stron w jednej skali ---
     cell = (430, 330)
     views = []
-    for def_id in ("us_arm_m60a1", "us_arm_m551", "su_arm_t55", "su_arm_t72"):
+    for def_id in ("us_arm_m60a1", "us_arm_m551", "us_proto_mbt70", "su_arm_t62", "su_arm_t72", "su_proto_775"):
         unit = units[def_id]
         cam = look_at((0.0, 2.6, 13.5), (0.0, 1.2, 0.0))
         image = render_unit_scene(unit_triangles(unit), cam, cell, 34.0, textures, ground)
         length, height = unit_dims(unit)
         views.append((image, f"{unit['label']} · {length:.1f} × {height:.1f} m"))
     compose(views, "Czołgi 1975 — cały park sprzętu w jednej skali",
-            "M60A1/M48A5 (6 kół, wysoka wieża), M551 Sheridan (niski, 5 kół, napęd z przodu), "
-            "T-55/T-62 (kopuła, 5 dużych kół, beczki paliwa), T-72 (najniższy, 6 kół)",
+            "M60A1 (6 kół, wysoka wieża odlewana), M551 Sheridan (niski, 5 kół, napęd z przodu), "
+            "MBT-70 (płaska wieża szersza od kadłuba), T-62 (kopuła, 5 kół), T-72 (niski, 6 kół), "
+            "Obiekt 775 (wieża-dysk, najniższy)",
             out_dir / "render_porownanie.png", cell)
 
     # --- 3. Wozy bojowe obu stron ---
@@ -521,7 +522,7 @@ def main():
 
     # --- 4. Strony obok siebie: inna sylwetka, inne oznaczenie ---
     views = []
-    for def_id in ("us_arm_m60a1", "su_arm_t55", "us_mech_m113", "su_mech_btr60"):
+    for def_id in ("us_arm_m60a1", "su_arm_t62", "us_mech_m113", "su_mech_btr60"):
         unit = units[def_id]
         cam = look_at((8.6, 4.2, 7.4), (0.0, 1.1, 0.0))
         image = render_unit_scene(unit_triangles(unit), cam, cell, 40.0, textures, ground)

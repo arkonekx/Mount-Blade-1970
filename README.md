@@ -121,32 +121,41 @@ sprzętu (mundur, pancerz, ogniwa gąsienicy), 6 ikon mapy (gracz, wróg, cel,
 miasto, łódź, zwiadowca) i 2 oznaczenia państwa (biała gwiazda USA, czerwona
 gwiazda ZSRR).
 
-Sylwetki pojazdów są składane z setek brył, ale **każdy wóz ma własną funkcję
-budującą**, wzorowaną na prawdziwym pierwowzorze z 1975 roku: czołg ma **256
-brył** (pochyłe płyty pancerza, fartuchy błotników, dwie gąsienice z ogniwami,
-koła jezdne i rolki powrotne, wieża z jarzmem i lufą, włazy, anteny, reflektory,
-wyposażenie zewnętrzne), wóz bojowy **128 brył**, a piechur 10 brył (ciało, hełm,
-plecak, kończyny, broń). Różnice widać po sylwetce, nie po kolorze:
+Sylwetki pojazdów są składane z **1024 brył** każdy (piechur: 10), a **każdy
+wóz ma własną funkcję budującą**, wzorowaną na prawdziwym pierwowzorze z 1975
+roku (wzorcem były publiczne modele 3D na Sketchfabie i dane wymiarowe): pochyłe
+płyty pancerza, fartuchy błotników, pełne bieżnie z pojedynczych ogniw, koła
+jezdne z piastami i śrubami, rolki, koła napędowe z zębami, wieże z jarzmem,
+lufami, włazami, antenami, reflektorami i wyposażeniem zewnętrznym. Różnice
+widać po sylwetce, nie po kolorze:
 
-* **M48A5** — okrągły nos odlewu i krótsza lufa, **M60A1** — klinowy nos, dłuższa
-  lufa i reflektor AN/VSS-1 nad działem (oba działo 105 mm, sześć kół jezdnych),
-* **M551 Sheridan** — niski, lekki, pięć dużych kół, napęd z przodu, działo 152 mm,
-* **T-55** (działo 100 mm) i **T-62** (115 mm, dłuższa lufa) — kopuła odlewana,
-  pięć kół, beczki paliwa na błotniku,
-* **T-72 Ural** — najniższy z czołgów, działo 125 mm z koszulką termiczną i rura
-  do pokonywania przeszkód wodnych,
-* **M113** (pudełko z falochronem i rampą) i **M577** (wozówka dowodzenia z
-  wysokim przedziałem), **BTR-60PB** (jedyny wóz kołowy — cztery osie na stronę),
-  **BMP-1** (niski klin z działem 73 mm i wyrzutnią 9M14), **MT-LB** (najniższy
-  ciągnik, mała wieżyczka z km-em; wariant mostowy dokłada most MTU-20).
+* **M60A1** — klinowy nos, działo 105 mm, reflektor AN/VSS-1 nad lufą, sześć
+  kół jezdnych i wysoka wieża odlewana z koszem; wariant inżynieryjny M728 CEV
+  dokłada lemiesz i żuraw,
+* **M551 Sheridan** — niski, lekki, pięć dużych kół, napęd z przodu, grube
+  działo 152 mm z przedmuchiwaczem,
+* **MBT-70** (prototyp USA/RFN) — ogromna płaska wieża szersza od kadłuba,
+  działo 152 mm, zdalne działko 20 mm w kopułce, siedem kół,
+* **T-62 Obr. 1972** — kopuła odlewana, pięć kół rozstawionych równo (po tym
+  odróżnia się od T-55), działo 115 mm bez hamulca wylotowego, rura do
+  brodzenia OPVT, beczki paliwa na błotniku,
+* **T-72 Ural** — niski, sześć kół, działo 125 mm z koszulką termiczną i rura
+  snorkla na tyle wieży,
+* **Obiekt 775** (prototyp ZSRR) — czołg rakietowy na podwoziu T-64: płaska
+  wieża-dysk szersza od kadłuba, cienkie działo 125 mm, lemiesz, najniższy
+  z parku (1,9 m),
+* **M113** (pudełko z falochronem i rampą; wariant TOW dokłada wyrzutnię),
+  **BTR-60PB** (jedyny wóz kołowy — cztery osie na stronę), **BMP-1** (niski
+  klin z działkiem 73 mm i wyrzutnią 9M14), **MT-LB** (najniższy ciągnik, mała
+  wieżyczka z km-em; wariant mostowy dokłada most MTU-20).
 
 Barwy są **fabryczne**: olive drab dla USA, zieleń 4BO dla ZSRR. Stronę rozpoznaje
 się po sylwetce i po gwieździe państwowej (`assets/textures/markings/`) — biała
 gwiazda USA na dachu wieży i burtach kadłuba, czerwona gwiazda ZSRR. Dopiero
 w bitwie przynależność jednostki pokazuje pierścień na ziemi (`COLOR_PLAYER`,
 `COLOR_FRIEND`, `COLOR_ENEMY`). Bryły dzielą wspólne materiały
-(`_material_cache`), więc mimo tysiąca brył w bitwie powstaje kilkadziesiąt
-materiałów, a nie tysiące.
+(`_material_cache`), więc mimo dziesiątek tysięcy brył w bitwie powstaje
+kilkadziesiąt materiałów, a nie tysiące.
 
 Tekstury sprzętu są jasne i neutralne, bo materiał mnoży je przez barwę wozu
 (`albedo_color`): detal (nity, spoiny, ogniwa) daje tekstura, a kolor to
