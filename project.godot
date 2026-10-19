@@ -1,0 +1,19 @@
+; Ustawienia projektu "Zimna Wojna 1975" (Godot 4.7).
+config_version=5
+
+[application]
+
+config/name="Zimna Wojna 1975"
+config/description="Kampania USA vs ZSRR w 1975 roku: mapa 2D z mgłą wojny i bitwy FPS w 3D."
+run/main_scene="res://scenes/campaign.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
