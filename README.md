@@ -127,8 +127,9 @@ assets/textures/*/README.md         palety, prompty, instrukcja odtworzenia
 Zestaw: 13 rodzajów terenu (kafle mapy i materiały gruntu bitwy), 5 tekstur
 otoczenia bitwy (kora i korona drzew, skała, ściana bloku, dach), 3 tekstury
 sprzętu (mundur, pancerz, ogniwa gąsienicy), 6 ikon mapy (gracz, wróg, cel,
-miasto, łódź, zwiadowca) i 2 oznaczenia państwa (biała gwiazda USA, czerwona
-gwiazda ZSRR).
+miasto, łódź, zwiadowca), 2 oznaczenia państwa (biała gwiazda USA, czerwona
+gwiazda ZSRR) i 7 ikon HUD bitwy (karabin, km, wyrzutnia ppanc, armata oraz
+piechota, wóz bojowy, czołg).
 
 Sylwetki pojazdów są składane z **1024 brył** każdy (piechur: 10), a **każdy
 wóz ma własną funkcję budującą**, wzorowaną na prawdziwym pierwowzorze z 1975

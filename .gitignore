@@ -18,3 +18,7 @@ tools/art/raw/
 # Cache Pythona
 __pycache__/
 *.pyc
+
+# Rozpakowana binarka Godota (w repo trzymamy tylko .gz)
+tools/godot/bin/Godot_v*
+!tools/godot/bin/*.gz

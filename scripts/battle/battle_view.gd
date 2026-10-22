@@ -37,6 +37,15 @@ var overlay: ColorRect
 var overlay_label: Label
 var crosshair_h: ColorRect
 var crosshair_v: ColorRect
+var health_bar: ColorRect
+var health_bar_bg: ColorRect
+var health_label: Label
+var org_bar: ColorRect
+var org_bar_bg: ColorRect
+var weapon_icon: TextureRect
+var target_icon: TextureRect
+var ammo_label: Label
+var target_label: Label
 
 var unit_nodes: Array = []
 var messages: Array = []
@@ -1592,6 +1601,8 @@ func _build_hud(terrain_name: String, is_night: bool) -> void:
 	crosshair_v.size = Vector2(2, 18)
 	hud.add_child(crosshair_v)
 
+	_build_hud_bars()
+
 	status_label = Label.new()
 	status_label.position = Vector2(12, 8)
 	status_label.size = Vector2(900, 24)
@@ -1608,7 +1619,7 @@ func _build_hud(terrain_name: String, is_night: bool) -> void:
 	hint_label.position = Vector2(12, 578)
 	hint_label.size = Vector2(1260, 34)
 	hint_label.add_theme_font_size_override("font_size", 12)
-	hint_label.text = "WSAD — ruch, mysz — obrót, LPM/Spacja — ognia, E — pojazd, R — odwrót (x < 40 m), Esc — pauza\nTeren: %s%s" % [terrain_name, ", noc" if is_night else ""]
+	hint_label.text = "WSAD — ruch, mysz — obrót, LPM/Spacja — ognia, E — pojazd, R — odwrót (x < 40 m), Esc — pauza\nAmunicja przeładowuje się z zapasu; bez naboi broń milczy. Teren: %s%s" % [terrain_name, ", noc" if is_night else ""]
 	hud.add_child(hint_label)
 
 	overlay = ColorRect.new()
@@ -1625,6 +1636,73 @@ func _build_hud(terrain_name: String, is_night: bool) -> void:
 	overlay_label.add_theme_font_size_override("font_size", 17)
 	overlay_label.visible = false
 	hud.add_child(overlay_label)
+
+
+## Paski zdrowia i organizacji (lewy dół) oraz ikona broni z amunicją i ikona
+## klasy celu (prawy dół). Ikony to tekstury AI z `assets/textures/hud/`;
+## gdyby ich brakowało, HUD działa dalej — zostają same podpisy.
+func _build_hud_bars() -> void:
+	# --- zdrowie ---
+	health_bar_bg = ColorRect.new()
+	health_bar_bg.color = Color(0.10, 0.12, 0.14, 0.78)
+	health_bar_bg.position = Vector2(14, 634)
+	health_bar_bg.size = Vector2(238, 18)
+	hud.add_child(health_bar_bg)
+
+	health_bar = ColorRect.new()
+	health_bar.color = Color(0.35, 0.80, 0.42)
+	health_bar.position = Vector2(16, 636)
+	health_bar.size = Vector2(234, 14)
+	hud.add_child(health_bar)
+
+	health_label = Label.new()
+	health_label.position = Vector2(14, 654)
+	health_label.size = Vector2(238, 18)
+	health_label.add_theme_font_size_override("font_size", 12)
+	hud.add_child(health_label)
+
+	# --- organizacja ---
+	org_bar_bg = ColorRect.new()
+	org_bar_bg.color = Color(0.10, 0.12, 0.14, 0.78)
+	org_bar_bg.position = Vector2(14, 674)
+	org_bar_bg.size = Vector2(238, 14)
+	hud.add_child(org_bar_bg)
+
+	org_bar = ColorRect.new()
+	org_bar.color = Color(0.36, 0.60, 0.92)
+	org_bar.position = Vector2(16, 676)
+	org_bar.size = Vector2(234, 10)
+	hud.add_child(org_bar)
+
+	# --- broń i amunicja (prawy dół) ---
+	weapon_icon = TextureRect.new()
+	weapon_icon.position = Vector2(1098, 620)
+	weapon_icon.size = Vector2(64, 64)
+	weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hud.add_child(weapon_icon)
+
+	ammo_label = Label.new()
+	ammo_label.position = Vector2(1172, 628)
+	ammo_label.size = Vector2(96, 22)
+	ammo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ammo_label.add_theme_font_size_override("font_size", 20)
+	hud.add_child(ammo_label)
+
+	# --- cel (prawy dolny róg) ---
+	target_icon = TextureRect.new()
+	target_icon.position = Vector2(1178, 664)
+	target_icon.size = Vector2(40, 40)
+	target_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	target_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hud.add_child(target_icon)
+
+	target_label = Label.new()
+	target_label.position = Vector2(1080, 704)
+	target_label.size = Vector2(186, 20)
+	target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	target_label.add_theme_font_size_override("font_size", 13)
+	hud.add_child(target_label)
 
 
 func _join_lines(items: Array) -> String:
@@ -1707,6 +1785,7 @@ func _update_hud() -> void:
 		sim.player_weapon_name(),
 		"brak" if distance < 0.0 else "%d m" % int(distance),
 	]
+	_update_hud_bars(distance)
 	log_label.text = _join_lines(messages)
 	if sim.result != "":
 		overlay.visible = true
@@ -1719,6 +1798,40 @@ func _update_hud() -> void:
 	else:
 		overlay.visible = false
 		overlay_label.visible = false
+
+
+## Paski, ikona broni z amunicją i klasa celu. Kolor paska zdrowia zmienia
+## się z zielonego (pełne) przez żółty do czerwonego (krytyczne).
+func _update_hud_bars(distance: float) -> void:
+	var ratio: float = sim.player_health_ratio()
+	health_bar.size.x = maxf(0.0, 234.0 * ratio)
+	health_bar.color = Color(0.85, 0.25, 0.22) if ratio < 0.34 else (
+		Color(0.88, 0.72, 0.25) if ratio < 0.67 else Color(0.35, 0.80, 0.42))
+	health_label.text = "ZDROWIE  %d / %d" % [sim.player_health(), sim.player_health_max()]
+
+	var org: float = sim.player_org()
+	org_bar.size.x = maxf(0.0, 234.0 * clampf(org / 100.0, 0.0, 1.0))
+	org_bar.color = Color(0.85, 0.40, 0.28) if org < 35.0 else Color(0.36, 0.60, 0.92)
+
+	var weapon_id: String = sim.player_weapon_id()
+	weapon_icon.texture = GameTextures.hud("weapon_" + weapon_id) if weapon_id != "" else null
+	var ammo: Dictionary = sim.player_ammo(weapon_id)
+	if weapon_id == "":
+		ammo_label.text = "--"
+		ammo_label.add_theme_color_override("font_color", Color(0.70, 0.74, 0.80))
+	else:
+		ammo_label.text = "%d / %d" % [int(ammo.get("loaded", 0)), int(ammo.get("reserve", 0))]
+		var low: bool = int(ammo.get("loaded", 0)) <= maxi(1, int(ammo.get("size", 1)) / 4)
+		ammo_label.add_theme_color_override("font_color",
+			Color(0.95, 0.55, 0.25) if low else Color(0.94, 0.95, 0.97))
+
+	var target_cls: String = sim.player_target_class()
+	target_icon.texture = GameTextures.hud("target_" + target_cls) if target_cls != "" else null
+	if target_cls == "":
+		target_label.text = "brak celu"
+	else:
+		var cls_pl: String = "czołg" if target_cls == "armor" else ("wóz bojowy" if target_cls == "mech" else "piechota")
+		target_label.text = "%s  ·  %d m" % [cls_pl, int(maxf(0.0, distance))]
 
 
 func _result_text(result: String) -> String:

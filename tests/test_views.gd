@@ -86,6 +86,16 @@ func _test_battle_view() -> void:
 	_check(unique_materials.size() <= 64,
 		"Materiały nie są dzielone: %d unikalnych materiałów w scenie bitwy" % unique_materials.size())
 
+	# HUD: paski i ikony muszą istnieć i reagować na stan symulacji.
+	for field in ["health_bar", "health_bar_bg", "health_label", "org_bar", "org_bar_bg",
+			"weapon_icon", "target_icon", "ammo_label", "target_label"]:
+		_check(view.get(field) != null, "HUD bitwy nie ma %s" % field)
+	if view.health_bar != null and view.weapon_icon != null:
+		view._update_hud_bars(120.0)
+		_check(view.health_bar.size.x > 0.0, "Pasek zdrowia jest pusty przy pełnym zdrowiu")
+		_check(view.ammo_label.text.find("/") >= 0, "Etykieta amunicji nie pokazuje magazynka")
+		_check(view.target_label.text != "", "Etykieta celu jest pusta")
+
 	print("  jednostek: %d, sylwetki: %s, brył z teksturą: %d, unikalnych materiałów: %d"
 		% [sim.units.size(), str(counts), textured, unique_materials.size()])
 	await _test_shapes(view)

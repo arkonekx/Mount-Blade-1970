@@ -14,6 +14,7 @@ func _initialize() -> void:
 	_test_best_weapon()
 	_test_can_hit()
 	_test_fire_roll()
+	_test_health_and_ammo()
 	_test_commander_and_end()
 	_test_mines()
 	_test_ai()
@@ -207,6 +208,58 @@ func _test_fire_roll() -> void:
 			strong_hits += 1
 	_check(float(strong_hits) / float(rolls) < 0.95, "Szansa trafienia nie może przekraczać 0.9")
 	_check(float(strong_hits) / float(rolls) > 0.80, "Szansa trafienia powinna sięgać sufitu 0.9")
+
+
+## Zdrowie i amunicja: czołg nie pada od jednego strzału, piechur pada od
+## dwóch-trzech, a broń bez naboi przestaje strzelać.
+func _test_health_and_ammo() -> void:
+	var sim = _new_sim()
+	sim.obstacles = []
+	var tank: Dictionary = _enemy_unit(sim, "armor")
+	var rifle: Dictionary = BattleSim.WEAPONS["rifle"]
+	var gun: Dictionary = BattleSim.WEAPONS["gun"]
+
+	# Pancerz: karabin prawie nie rysuje czołgu, armata owszem.
+	var rifle_hit: float = sim._damage_of(rifle, tank)
+	var gun_hit: float = sim._damage_of(gun, tank)
+	_check(rifle_hit < 10.0, "Karabin zadaje czołgowi %.0f obrażeń — pancerz nie działa" % rifle_hit)
+	_check(gun_hit > rifle_hit * 3.0, "Armata powinna przebijać pancerz mocniej niż karabin")
+
+	# Czołg ma więcej zdrowia niż jeden strzał armaty.
+	_check(float(tank["hp_max"]) > gun_hit * 2.0,
+		"Czołg (%.0f HP) pada od jednego strzału armaty (%.0f)" % [float(tank["hp_max"]), gun_hit])
+
+	# Piechur pada od dwóch strzałów z karabinu.
+	var foot: Dictionary = _enemy_unit(sim, "infantry")
+	var shots: int = 0
+	while bool(foot["alive"]) and shots < 10:
+		sim._damage(foot, sim._damage_of(rifle, foot))
+		shots += 1
+	_check(shots >= 2 and shots <= 5, "Piechur powinien padać po 2-5 strzałach (padł po %d)" % shots)
+
+	# Amunicja: magazynek się kończy i przeładowuje z zapasu.
+	var shooter: Dictionary = _player_unit(sim)
+	var mag: Dictionary = shooter["mag"]["rifle"]
+	var total: int = int(mag["loaded"]) + int(mag["reserve"])
+	var fired: int = 0
+	while sim._consume_round(shooter, "rifle"):
+		fired += 1
+		if fired > 1000:
+			break
+	_check(fired == total, "Wystrzelono %d naboi, a magazynek miał %d" % [fired, total])
+	_check(sim._ammo_left(shooter, "rifle") == 0, "Po wystrzelaniu amunicji zostały naboje")
+	_check(not sim._consume_round(shooter, "rifle"), "Pusty magazynek pozwolił strzelić")
+
+	# Bez amunicji broń nie jest wybierana do strzału.
+	var target: Dictionary = _enemy_unit(sim, "infantry")
+	target["x"] = float(shooter["x"]) + 50.0
+	target["z"] = float(shooter["z"])
+	_check(sim._best_weapon(shooter, target).is_empty(),
+		"Bez amunicji _best_weapon nadal zwraca broń")
+
+	# HUD czyta te same wartości.
+	_check(sim.player_health_max() > 0, "HUD nie ma maksymalnego zdrowia gracza")
+	_check(sim.player_org() >= 0.0 and sim.player_org() <= 100.0, "Organizacja poza zakresem")
 
 
 func _test_commander_and_end() -> void:

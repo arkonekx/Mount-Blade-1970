@@ -18,6 +18,7 @@ const PROP_DIR := "res://assets/textures/props"
 const UNIT_DIR := "res://assets/textures/units"
 const ICON_DIR := "res://assets/textures/icons"
 const MARKING_DIR := "res://assets/textures/markings"
+const HUD_DIR := "res://assets/textures/hud"
 
 ## Klucze w kolejności `Terrain.Kind` z scripts/logic/terrain.gd.
 const KEYS: Array = [
@@ -38,12 +39,19 @@ const ICON_KEYS: Array = ["player", "enemy", "objective", "city", "boat", "scout
 ## Klucze oznaczeń państwowych malowanych na pojazdach (tools/art/make_markings.py).
 const MARKING_KEYS: Array = ["star_us", "star_su"]
 
+## Klucze ikon HUD bitwy (tools/art/process_hud.py): broń gracza i klasa celu.
+const HUD_KEYS: Array = [
+	"weapon_rifle", "weapon_hmg", "weapon_at", "weapon_gun",
+	"target_infantry", "target_mech", "target_armor",
+]
+
 static var _masters: Dictionary = {}
 static var _tiles: Dictionary = {}
 static var _props: Dictionary = {}
 static var _units: Dictionary = {}
 static var _icons: Dictionary = {}
 static var _markings: Dictionary = {}
+static var _hud: Dictionary = {}
 
 
 ## Tekstura 512×512 dla materiału 3D (albo null, gdy pliku brak).
@@ -90,6 +98,18 @@ static func icon(key: String) -> Texture2D:
 ## Oznaczenie państwowe na pancerzu (RGBA) albo null.
 static func marking(key: String) -> Texture2D:
 	return _load_named(_markings, MARKING_DIR, key)
+
+
+## Ikona HUD bitwy (broń, klasa celu; RGBA) albo null.
+static func hud(key: String) -> Texture2D:
+	return _load_named(_hud, HUD_DIR, key)
+
+
+static func all_hud_available() -> bool:
+	for key in HUD_KEYS:
+		if hud(str(key)) == null:
+			return false
+	return true
 
 
 static func all_markings_available() -> bool:

@@ -67,6 +67,16 @@ pojedyncze ogniwa gąsienic, koła jezdne, błotniki i reflektory:
 
 ![Makieta pojazdów — rzut z boku](makieta_pojazdow.jpg)
 
+## Ikony HUD bitwy
+
+Siedem nowych tekstur AI (128×128, tło magentowe wycięte przez
+`tools/art/process_hud.py`): cztery bronie (karabin, km, wyrzutnia ppanc,
+armata) i trzy klasy celu (piechota, wóz bojowy, czołg). HUD podbarwia je
+przez `modulate`, więc kolor zależy od stanu, a nie od pliku — amunicja
+zmienia kolor na pomarańczowy, gdy magazynek jest prawie pusty:
+
+![Ikony HUD bitwy](arkusz_hud.jpg)
+
 ## Arkusze tekstur (grafika AI)
 
 Tekstury jednolite kolorystycznie (tint-neutral), więc ta sama tekstura

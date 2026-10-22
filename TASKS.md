@@ -128,7 +128,17 @@ pozostaje nietknięta i nie jest częścią tego repozytorium.
       ujęcia M60A1 (z gwiazdą na dachu widoczną z góry), barwy fabryczne
       i jednostki w jednej skali; `preview_textures.py` rysuje gwiazdy
       w makiecie (białe USA, czerwone ZSRR) i wybiera wozy po `def_id`
-- [ ] modele siatkowe pojazdów (dziś kanciaste bryły) i ikony samego HUD
+- [x] **HUD bitwy** (etap 9): paski zdrowia i organizacji, ikona broni
+      z licznikiem amunicji (`magazynek / zapas`, kolor ostrzegawczy przy pustym),
+      ikona klasy celu z odległością; 7 nowych tekstur AI w
+      `assets/textures/hud/` (`tools/art/process_hud.py`), loader `GameTextures.hud()`,
+      testy w `test_textures.gd` i `test_views.gd`
+- [x] **zdrowie, pancerz i amunicja** w symulacji: piechur 100 HP, wóz 320 HP
+      (pancerz 55%), czołg 520 HP (pancerz 85%); trafienie zadaje obrażenia
+      z `DAMAGE`, a nie zabija od razu; magazynki i zapas (`MAGAZINE`,
+      `MAGAZINE_RESERVE`), przeładowanie z zapasu, broń bez naboi nie jest
+      wybierana do strzału
+- [ ] modele siatkowe pojazdów (dziś kanciaste bryły)
 
 ### Etap 8 — modele pojazdów w 1024 bryłach (2026-10-19)
 

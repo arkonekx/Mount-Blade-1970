@@ -45,6 +45,41 @@ const MINE_RADIUS := 3.0
 const PLAYER_EYE := 1.7
 const VEHICLE_EYE := 2.4
 
+# --- zdrowie i amunicja ---
+## Punkty zdrowia według klasy. Pojazdy mają dużo HP, ale trafienie z broni
+## ppanc zabiera im procent, a nie całość — pancerz tłumi słabsze ciosy.
+const HP_INFANTRY := 100.0
+const HP_MECH := 320.0
+const HP_ARMOR := 520.0
+
+## Pancerz: udział obrażeń, jaki tłumi (0 = brak, 0.85 = przechodzi 15%).
+const ARMOR_INFANTRY := 0.0
+const ARMOR_MECH := 0.55
+const ARMOR_ARMOR := 0.85
+
+## Ile obrażeń zabiera trafienie bronią, zanim zadziała pancerz.
+const DAMAGE: Dictionary = {
+	"rifle": 22.0,
+	"hmg": 18.0,
+	"at": 120.0,
+	"gun": 150.0,
+}
+
+## Magazynki: ile strzałów w jednym i ile zapasowych (nie licząc załadowanego).
+const MAGAZINE: Dictionary = {
+	"rifle": 20,
+	"hmg": 50,
+	"at": 4,
+	"gun": 12,
+}
+const MAGAZINE_RESERVE: Dictionary = {
+	"rifle": 6,
+	"hmg": 4,
+	"at": 3,
+	"gun": 4,
+}
+
+
 ## Odległość, w jakiej AI się zatrzymuje (m).
 const STOP_DISTANCE: Dictionary = {
 	"aggressive": 120.0,
@@ -184,6 +219,35 @@ func _spread(index: int, total: int) -> float:
 	return SPREAD_MIN + step * float(index) + rng.float_range(-8.0, 8.0)
 
 
+func _max_hp(cls: String) -> float:
+	if cls == UnitsData.CLS_ARMOR:
+		return HP_ARMOR
+	if cls == UnitsData.CLS_MECH:
+		return HP_MECH
+	return HP_INFANTRY
+
+
+func _armor_of(cls: String) -> float:
+	if cls == UnitsData.CLS_ARMOR:
+		return ARMOR_ARMOR
+	if cls == UnitsData.CLS_MECH:
+		return ARMOR_MECH
+	return ARMOR_INFANTRY
+
+
+## Amunicja na start: każda broń jednostki ma pełny magazynek i zapas.
+func _new_magazine(def_id: String) -> Dictionary:
+	var out: Dictionary = {}
+	for weapon in _weapons_for(def_id, ""):
+		var id: String = str(weapon["id"])
+		if out.has(id):
+			continue
+		var size: int = int(MAGAZINE.get(id, 10))
+		var reserve: int = int(MAGAZINE_RESERVE.get(id, 3))
+		out[id] = {"loaded": size, "reserve": size * reserve, "size": size}
+	return out
+
+
 func _make_unit(ref: Dictionary, is_friend: bool, x: float, z: float, is_player: bool) -> Dictionary:
 	var cls: String = str(ref.get("cls", UnitsData.CLS_INFANTRY))
 	var skill: int = FRIENDLY_SKILL if is_friend else int(enemy_info.get("skill", 3))
@@ -204,6 +268,10 @@ func _make_unit(ref: Dictionary, is_friend: bool, x: float, z: float, is_player:
 		"skill": skill,
 		"personality": personality,
 		"weapon": "",
+		"hp": _max_hp(cls),
+		"hp_max": _max_hp(cls),
+		"armor": _armor_of(cls),
+		"mag": _new_magazine(str(ref.get("def_id", ""))),
 	}
 
 
@@ -407,12 +475,22 @@ func _fire(shooter: Dictionary, target: Dictionary, quiet: bool = false) -> bool
 		if not quiet:
 			last_message = "Cel poza zasięgiem albo zasłonięty."
 		return false
+	# Amunicja: pusty magazynek przeładowujemy, a bez zapasu broń milczy.
+	if not _consume_round(shooter, str(weapon["id"])):
+		if not quiet:
+			last_message = "Koniec amunicji (%s)." % str(weapon["name"])
+		return false
 	shooter["weapon"] = str(weapon["id"])
 	shooter["ready_at"] = time + float(weapon["reload"]) * _reload_mult(bool(shooter["side"]))
 	if _fire_roll(shooter, target, weapon):
-		_kill(target)
+		var dmg: float = _damage_of(weapon, target)
+		var killed: bool = _damage(target, dmg)
 		if not quiet:
-			last_message = "%s trafiony (%s)." % [str(target["name"]), str(weapon["name"])]
+			if killed:
+				last_message = "%s trafiony (%s)." % [str(target["name"]), str(weapon["name"])]
+			else:
+				last_message = "%s trafiony (%s) — %d%% wytrzymałości." % [
+					str(target["name"]), str(weapon["name"]), int(round(100.0 * _hp_ratio(target)))]
 		return true
 	if not quiet:
 		last_message = "Strzał chybiony."
@@ -428,6 +506,8 @@ func _best_weapon(unit: Dictionary, target: Dictionary) -> Dictionary:
 	for weapon in _weapons_for(str(unit["def_id"]), str(unit["cls"])):
 		if float(unit["ready_at"]) > time:
 			continue  # broń jeszcze się przeładowuje
+		if _ammo_left(unit, str(weapon["id"])) <= 0:
+			continue  # ani naboju w magazynku, ani w zapasie
 		var targets: Array = weapon["targets"]
 		if not targets.has(cls):
 			continue
@@ -449,7 +529,7 @@ func _can_engage(unit: Dictionary, target: Dictionary) -> bool:
 	for weapon in _weapons_for(str(unit["def_id"]), str(unit["cls"])):
 		if not (weapon["targets"] as Array).has(cls):
 			continue
-		if float(weapon["range"]) >= dist:
+		if float(weapon["range"]) >= dist and _ammo_left(unit, str(weapon["id"])) > 0:
 			return true
 	return false
 
@@ -475,6 +555,60 @@ func _can_hit(shooter: Dictionary, target: Dictionary, weapon: Dictionary) -> bo
 	if night and dist > NIGHT_RANGE:
 		return false
 	return not _los_blocked(shooter, target)
+
+
+## Ile naboi zostało broni (magazynek + zapas).
+func _ammo_left(unit: Dictionary, weapon_id: String) -> int:
+	var mag: Dictionary = unit.get("mag", {})
+	if not mag.has(weapon_id):
+		return 0
+	var entry: Dictionary = mag[weapon_id]
+	return int(entry["loaded"]) + int(entry["reserve"])
+
+
+## Zużywa nabój: najpierw z magazynka, a gdy pusty — przeładowanie z zapasu.
+func _consume_round(unit: Dictionary, weapon_id: String) -> bool:
+	var mag: Dictionary = unit.get("mag", {})
+	if not mag.has(weapon_id):
+		return false
+	var entry: Dictionary = mag[weapon_id]
+	if int(entry["loaded"]) <= 0:
+		if int(entry["reserve"]) <= 0:
+			return false
+		var size: int = int(entry["size"])
+		var take: int = mini(size, int(entry["reserve"]))
+		entry["loaded"] = take
+		entry["reserve"] = int(entry["reserve"]) - take
+	entry["loaded"] = int(entry["loaded"]) - 1
+	mag[weapon_id] = entry
+	unit["mag"] = mag
+	return true
+
+
+## Obrażenia trafienia: baza broni minus pancerz celu, co najmniej 10% bazy.
+func _damage_of(weapon: Dictionary, target: Dictionary) -> float:
+	var base: float = float(DAMAGE.get(str(weapon["id"]), 20.0))
+	var armor: float = float(target.get("armor", 0.0))
+	return maxf(base * 0.1, base * (1.0 - armor))
+
+
+## Zadaje obrażenia; zwraca true, gdy cel padł.
+func _damage(target: Dictionary, amount: float) -> bool:
+	if not bool(target["alive"]):
+		return false
+	target["hp"] = maxf(0.0, float(target["hp"]) - amount)
+	if float(target["hp"]) <= 0.0:
+		_kill(target)
+		return true
+	return false
+
+
+## Udział zdrowia 0..1 (dla HUD i pasków).
+func _hp_ratio(unit: Dictionary) -> float:
+	var top: float = float(unit.get("hp_max", 1.0))
+	if top <= 0.0:
+		return 0.0
+	return clampf(float(unit.get("hp", 0.0)) / top, 0.0, 1.0)
 
 
 func _fire_roll(shooter: Dictionary, target: Dictionary, weapon: Dictionary) -> bool:
@@ -714,6 +848,74 @@ func player_weapon_name() -> String:
 	if weapon.is_empty():
 		return "brak broni na ten cel"
 	return str(weapon["name"])
+
+
+## Udział zdrowia gracza (albo pojazdu, którym dowodzi) 0..1 — pasek HUD.
+func player_health_ratio() -> float:
+	var unit: Dictionary = _shooter()
+	if unit.is_empty():
+		return 0.0
+	return _hp_ratio(unit)
+
+
+func player_health() -> int:
+	var unit: Dictionary = _shooter()
+	if unit.is_empty():
+		return 0
+	return int(round(float(unit.get("hp", 0.0))))
+
+
+func player_health_max() -> int:
+	var unit: Dictionary = _shooter()
+	if unit.is_empty():
+		return 0
+	return int(round(float(unit.get("hp_max", 0.0))))
+
+
+## Identyfikator broni, którą gracz w tej chwili raziłby najskuteczniej.
+func player_weapon_id() -> String:
+	var shooter: Dictionary = _shooter()
+	if shooter.is_empty():
+		return ""
+	var target: Dictionary = _nearest_enemy(shooter)
+	if target.is_empty():
+		return ""
+	var weapon: Dictionary = _best_weapon(shooter, target)
+	if weapon.is_empty():
+		# brak gotowej broni — pokaż broń, która ma jeszcze amunicję
+		for candidate in _weapons_for(str(shooter["def_id"]), str(shooter["cls"])):
+			if _ammo_left(shooter, str(candidate["id"])) > 0:
+				return str(candidate["id"])
+		return ""
+	return str(weapon["id"])
+
+
+## Amunicja wskazanej broni: {loaded, reserve, size} (pusty słownik, gdy brak).
+func player_ammo(weapon_id: String = "") -> Dictionary:
+	var shooter: Dictionary = _shooter()
+	if shooter.is_empty():
+		return {}
+	var key: String = weapon_id if weapon_id != "" else player_weapon_id()
+	var mag: Dictionary = shooter.get("mag", {})
+	if not mag.has(key):
+		return {"loaded": 0, "reserve": 0, "size": 1}
+	return mag[key]
+
+
+## Klasa najbliższego celu ("infantry" / "mech" / "armor") albo "".
+func player_target_class() -> String:
+	var shooter: Dictionary = _shooter()
+	if shooter.is_empty():
+		return ""
+	var target: Dictionary = _nearest_enemy(shooter)
+	if target.is_empty():
+		return ""
+	return str(target["cls"])
+
+
+## Zorganizowanie strony gracza w procentach (0..100).
+func player_org() -> float:
+	return float(org[true])
 
 
 func distance_to_nearest_enemy() -> float:

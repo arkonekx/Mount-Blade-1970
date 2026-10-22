@@ -55,6 +55,16 @@ func _initialize() -> void:
 			_check(icon_texture.get_image().detect_alpha() != Image.ALPHA_NONE,
 				"Ikona %s nie ma przezroczystości (tło powinno być wycięte)" % str(key))
 	_check(GameTextures.all_icons_available(), "Nie wszystkie ikony są dostępne")
+	for key in GameTextures.HUD_KEYS:
+		var hud_texture: Texture2D = GameTextures.hud(str(key))
+		_check(hud_texture != null, "Brak ikony HUD %s" % str(key))
+		if hud_texture != null:
+			_check(hud_texture.get_width() == 128 and hud_texture.get_height() == 128,
+				"Ikona HUD %s ma rozmiar %d×%d, a HUD używa 128×128"
+				% [str(key), hud_texture.get_width(), hud_texture.get_height()])
+			_check(hud_texture.get_image().detect_alpha() != Image.ALPHA_NONE,
+				"Ikona HUD %s nie ma przezroczystości" % str(key))
+	_check(GameTextures.all_hud_available(), "Nie wszystkie ikony HUD są dostępne")
 	_check(GameTextures.load_error() == "", "Loader tekstur zgłosił błąd: %s" % GameTextures.load_error())
 	_report()
 
